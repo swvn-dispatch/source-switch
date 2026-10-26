@@ -14,6 +14,17 @@
     "user_data"
   ],
 
+  "actions": [
+    {
+      "id": "restart_dash",
+      "label": "Restart Dashboard Server",
+      "description": "Reload Source Switch so the elected dashboard service applies the current enabled and port settings.",
+      "button_label": "Restart Dashboard Server",
+      "button_variant": "filled",
+      "button_color": "blue"
+    }
+  ],
+
   "repo_url": "https://github.com/swvn-dispatch/source-switch",
   "help_url": "https://github.com/swvn-dispatch/source-switch"
 }

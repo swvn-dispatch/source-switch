@@ -52,7 +52,7 @@ class ManifestTests(unittest.TestCase):
             ["persistent_service", "network_listener", "proxy_internals", "user_data"],
         )
         self.assertNotIn("fields", manifest)
-        self.assertNotIn("actions", manifest)
+        self.assertEqual(manifest["actions"][0]["id"], "restart_dash")
 
     def test_runtime_fields_use_a_collapsible_dashboard_section(self):
         plugin_module = load_plugin_module()
