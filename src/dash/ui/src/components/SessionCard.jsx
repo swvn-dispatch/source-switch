@@ -29,7 +29,14 @@ const STATE_COLORS = {
 // Matches Dispatcharr's own Stats page badge colors (StreamConnectionCard.jsx)
 const SPEED_OK_THRESHOLD = 1.0;
 
-export function StreamStatsBadges({ stats, speed, size = 'sm', ...groupProps }) {
+export function StreamStatsBadges({
+  stats,
+  speed,
+  size = 'sm',
+  justify = 'center',
+  style,
+  ...groupProps
+}) {
   if (!stats) return null;
   const hasAny =
     stats.resolution ||
@@ -53,14 +60,14 @@ export function StreamStatsBadges({ stats, speed, size = 'sm', ...groupProps }) 
   return (
     <Group
       gap="xs"
-      justify="center"
+      justify={justify}
       {...groupProps}
       style={{
         flexWrap: 'wrap',
-        maxWidth: badgeCount > 3 ? 240 : undefined,
-        justifyContent: 'center',
-        marginInline: 'auto',
-        ...groupProps.style,
+        maxWidth: badgeCount > 3 ? 280 : undefined,
+        justifyContent: justify,
+        marginInline: justify === 'center' ? 'auto' : undefined,
+        ...style,
       }}
     >
       {stats.resolution && (
@@ -353,6 +360,9 @@ export default function SessionCard({
         label="Source"
         name={`source-switch-stream-${session.channel_id}`}
         autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         placeholder={streams === null ? 'Loading…' : 'Select a source'}
         data={streamOptions}
         value={currentStreamId}
@@ -360,6 +370,10 @@ export default function SessionCard({
         disabled={sourceDisabled || switching || streams === null}
         mb="sm"
         maxDropdownHeight={320}
+        styles={{
+          input: { userSelect: 'none', WebkitUserSelect: 'none' },
+          option: { userSelect: 'none', WebkitUserSelect: 'none' },
+        }}
         renderOption={({ option, checked }) => (
           <Stack gap={2} py={2} style={{ width: '100%' }}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -373,7 +387,13 @@ export default function SessionCard({
                 {option.provider}
               </Text>
             )}
-            {option.stats && <StreamStatsBadges stats={option.stats} size="xs" style={{ maxWidth: '100%' }} />}
+            {option.stats && (
+              <StreamStatsBadges
+                stats={option.stats}
+                size="xs"
+                justify="flex-start"
+              />
+            )}
           </Stack>
         )}
       />
