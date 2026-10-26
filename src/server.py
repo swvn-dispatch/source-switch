@@ -14,11 +14,27 @@ rather than baked in at build/start time, so it can be reconfigured live.
 
 import logging
 import socket
+import threading
 import time
 
 logger = logging.getLogger(__name__)
 
 _dash_api = None
+
+
+def _native_threading_class(name):
+    try:
+        import gevent.monkey
+
+        if gevent.monkey.is_module_patched("threading"):
+            return gevent.monkey.get_original("threading", name)
+    except ImportError:
+        pass
+    return getattr(threading, name)
+
+
+def _native_thread(target):
+    return _native_threading_class("Thread")(target=target)
 
 
 def _load_dash_api():
@@ -72,6 +88,7 @@ class SourceSwitchServer:
         self._server = None
         self._listener = None
         self._greenlet = None
+        self._shutdown_event = _native_threading_class("Event")()
         self.running = False
 
     # ------------------------------------------------------------------ WSGI
@@ -191,7 +208,6 @@ class SourceSwitchServer:
 
         try:
             from gevent import pywsgi
-            import gevent as _gevent
         except ImportError:
             logger.error("gevent is not installed; cannot start Source Switch server")
             return False
@@ -218,10 +234,13 @@ class SourceSwitchServer:
             return False
 
         self.running = True
+        self._shutdown_event.clear()
 
         try:
             def _run():
                 try:
+                    if self._shutdown_event.is_set():
+                        return
                     self._server = pywsgi.WSGIServer((self.host, self.port), self.wsgi_app, log=None)
                     self._server.serve_forever()
                 except OSError as e:
@@ -235,7 +254,10 @@ class SourceSwitchServer:
                         self._listener.close()
                         self._listener = None
 
-            self._greenlet = _gevent.spawn(_run)
+            self._greenlet = _native_thread(_run)
+            self._greenlet.name = "source-switch-dashboard"
+            self._greenlet.daemon = True
+            self._greenlet.start()
             return True
         except Exception as e:  # noqa: BLE001
             self.running = False
@@ -245,6 +267,7 @@ class SourceSwitchServer:
             return False
 
     def stop(self):
+        self._shutdown_event.set()
         if self._server:
             try:
                 self._server.stop()
@@ -256,6 +279,9 @@ class SourceSwitchServer:
             except OSError:
                 pass
             self._listener = None
+        if self._greenlet and self._greenlet is not threading.current_thread():
+            self._greenlet.join(timeout=5)
+        self._greenlet = None
         self.running = False
         logger.info("Source Switch server stopped")
 
