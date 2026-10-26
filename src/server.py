@@ -196,20 +196,15 @@ class SourceSwitchServer:
             logger.error("gevent is not installed; cannot start Source Switch server")
             return False
 
-        listener = None
         last_error = None
         for attempt in range(1, 4):
             try:
-                listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                listener.bind((self.host, self.port))
-                listener.listen(128)
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+                    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    listener.bind((self.host, self.port))
                 break
             except OSError as e:
                 last_error = e
-                if listener:
-                    listener.close()
-                    listener = None
                 if attempt < 3:
                     logger.info(
                         "Source Switch: port %s unavailable during leader handoff; retrying (%s)",
@@ -218,17 +213,16 @@ class SourceSwitchServer:
                     )
                     time.sleep(0.5)
 
-        if listener is None:
+        else:
             logger.info("Source Switch: port %s is unavailable (%s)", self.port, last_error)
             return False
 
-        self._listener = listener
         self.running = True
 
         try:
             def _run():
                 try:
-                    self._server = pywsgi.WSGIServer(self._listener, self.wsgi_app, log=None)
+                    self._server = pywsgi.WSGIServer((self.host, self.port), self.wsgi_app, log=None)
                     self._server.serve_forever()
                 except OSError as e:
                     logger.info("Source Switch server stopped during startup (%s)", e)
