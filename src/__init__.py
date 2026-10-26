@@ -14,7 +14,6 @@ below for how existing installs' saved settings carry over.
 import json
 import logging
 import os
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +69,6 @@ def _close_db_connections():
         pass
 
 
-def _get_settings() -> dict:
-    try:
-        from apps.plugins.models import PluginConfig
-        return PluginConfig.objects.get(key=PLUGIN_DB_KEY).settings
-    except Exception:
-        return {}
-
-
 def _migrate_legacy_settings():
     """One-time carry-over of settings saved under the old "force_fallback"
     key (from before the Source Switch rename) onto the new PLUGIN_DB_KEY row.
@@ -118,71 +109,82 @@ class Plugin:
     description = _PLUGIN_CONFIG["description"]
     version     = _PLUGIN_CONFIG["version"]
     author      = _PLUGIN_CONFIG["author"]
-
     actions = [
         {
             "id": "restart_dash",
             "label": "Restart Dashboard Server",
-            "description": "Stop and restart the embedded dashboard server, picking up port/enabled changes without a full Dispatcharr restart.",
+            "description": "Reload Source Switch so the elected dashboard service applies the current enabled and port settings.",
             "button_label": "Restart Dashboard Server",
             "button_variant": "filled",
             "button_color": "blue",
         },
     ]
 
-    # Lifecycle (init)
-
     def __init__(self):
+        self._dashboard_server = None
         try:
             _migrate_legacy_settings()
-            self._autostart()
         except Exception as e:
-            logger.warning(f"Source Switch dashboard auto-start skipped: {e}")
+            logger.warning(f"Source Switch legacy settings migration skipped: {e}")
         finally:
             _close_db_connections()
 
-    def _autostart(self):
-        settings = _get_settings()
-        if settings.get("dash_enabled", "disabled") != "enabled":
-            return
-        srv = _server()
-        existing = srv.get_server()
-        if existing and existing.is_running():
-            return
-        result = self._start_server(settings)
-        if result.get("status") == "success":
-            logger.info(f"Source Switch auto-start: {result['message']}")
-        else:
-            logger.warning(f"Source Switch auto-start failed: {result['message']}")
-
-    # Dynamic fields
-
     @property
     def fields(self):
-        """Regenerate fields from current DB settings on every request."""
-        return _config().build_plugin_fields(_get_settings())
+        """Return the runtime settings schema, including its UI section."""
+        return _config().PLUGIN_FIELDS
 
     # Action dispatcher
 
     def run(self, action: str, params: dict, context: dict):
         if action == "restart_dash":
-            return self._restart_server()
+            try:
+                from apps.plugins.loader import PluginManager
+
+                PluginManager.get().reload_plugin(PLUGIN_DB_KEY)
+            except Exception as e:
+                logger.error("Source Switch dashboard reload request failed", exc_info=True)
+                return {"status": "error", "message": f"Could not request dashboard reload: {e}"}
+            return {
+                "status": "success",
+                "message": "Dashboard reload requested. The elected service will apply the current settings shortly.",
+            }
         return {"status": "error", "message": f"Unknown action: {action}"}
 
-    # start/stop server
+    # Elected persistent-service lifecycle
+
+    def on_leader_acquired(self, context: dict):
+        """Start the listener only while this plugin instance owns leadership."""
+        settings = (context or {}).get("settings") or {}
+        if settings.get("dash_enabled", "enabled") != "enabled":
+            logger.info("Source Switch dashboard is disabled; elected service will not start")
+            self._stop_server()
+            return
+
+        result = self._start_server(settings)
+        if result["status"] == "success":
+            logger.info("Source Switch elected dashboard service started: %s", result["message"])
+        else:
+            logger.warning("Source Switch elected dashboard service failed to start: %s", result["message"])
+
+    def on_leader_lost(self, context: dict):
+        """Release this process's listener when Dispatcharr revokes leadership."""
+        self._stop_server()
 
     def _start_server(self, settings: dict = None) -> dict:
         cfg = _config()
-        settings = settings if settings is not None else _get_settings()
+        settings = settings or {}
         port = int(settings.get("dash_port") or cfg.DEFAULT_SERVER_PORT)
 
-        srv = _server()
-        existing = srv.get_server()
-        if existing and existing.is_running():
-            existing.stop()
+        if self._dashboard_server and self._dashboard_server.is_running():
+            return {
+                "status": "success",
+                "message": f"Source Switch dashboard server is already running on port {self._dashboard_server.port}",
+            }
 
-        server = srv.SourceSwitchServer(host="0.0.0.0", port=port)
+        server = _server().SourceSwitchServer(host="0.0.0.0", port=port)
         if server.start():
+            self._dashboard_server = server
             return {
                 "status": "success",
                 "message": f"Source Switch dashboard server started on http://0.0.0.0:{port}/",
@@ -192,24 +194,14 @@ class Plugin:
             "message": f"Failed to start server on port {port}; port may be in use",
         }
 
-    def _restart_server(self) -> dict:
-        settings = _get_settings()
-        srv = _server()
-        existing = srv.get_server()
-        if existing and existing.is_running():
-            existing.stop()
-
-        if settings.get("dash_enabled", "disabled") != "enabled":
-            return {"status": "success", "message": "Dashboard is disabled; server stopped."}
-
-        return self._start_server(settings)
+    def _stop_server(self):
+        server, self._dashboard_server = self._dashboard_server, None
+        if server:
+            logger.info("Stopping Source Switch dashboard server")
+            server.stop()
 
     # Lifecycle
 
     def stop(self, context: dict):
         """Called when the plugin is disabled or Dispatcharr shuts down."""
-        srv = _server()
-        server = srv.get_server()
-        if server and server.is_running():
-            logger.info("Plugin stopping, shutting down Source Switch dashboard server")
-            server.stop()
+        self._stop_server()

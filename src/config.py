@@ -1,22 +1,17 @@
-"""Plugin configuration and field definitions for Source Switch."""
-
-import json
-import os
+"""Shared Source Switch configuration defaults."""
 
 DEFAULT_SERVER_PORT = 9294
 DEFAULT_DASH_PATH = "/stats"
 DEFAULT_POLL_SECS = 5
 
 
-def _load_plugin_config() -> dict:
-    config_path = os.path.join(os.path.dirname(__file__), "plugin.json")
-    with open(config_path, "r") as f:
-        return json.load(f)
-
-
-PLUGIN_CONFIG = _load_plugin_config()
-
-_GLOBAL_SETTINGS_FIELDS = [
+PLUGIN_FIELDS = [
+    {
+        "id": "dashboard_settings",
+        "label": "Dashboard Settings",
+        "type": "section",
+        "collapsed": False,
+    },
     {
         "id": "dash_enabled",
         "label": "Web Dashboard",
@@ -26,13 +21,14 @@ _GLOBAL_SETTINGS_FIELDS = [
             {"value": "disabled", "label": "Disabled"},
             {"value": "enabled", "label": "Enabled"},
         ],
+        "section": "dashboard_settings",
         "description": (
             "Serves a mobile-friendly PWA dashboard for viewing live stream "
             "sessions, connected clients, and swapping sources. On by "
             "default. You may need to expose the configured port in your "
             "docker-compose.yml to reach it from outside the container. "
-            "After changing this or the port, use the 'Restart Dashboard "
-            "Server' action below (or restart Dispatcharr) to apply it."
+            "After changing this setting or the port, use the Restart "
+            "Dashboard Server action or restart Dispatcharr to apply it."
         ),
     },
     {
@@ -43,10 +39,11 @@ _GLOBAL_SETTINGS_FIELDS = [
         "min": 1024,
         "max": 65535,
         "placeholder": str(DEFAULT_SERVER_PORT),
+        "section": "dashboard_settings",
         "description": (
-            "TCP port the embedded dashboard server listens on. Requires "
-            "the 'Restart Dashboard Server' action (or a Dispatcharr "
-            "restart) to take effect."
+            "TCP port the embedded dashboard server listens on. Use the "
+            "Restart Dashboard Server action or restart Dispatcharr after "
+            "changing it."
         ),
     },
     {
@@ -55,6 +52,7 @@ _GLOBAL_SETTINGS_FIELDS = [
         "type": "string",
         "default": DEFAULT_DASH_PATH,
         "placeholder": DEFAULT_DASH_PATH,
+        "section": "dashboard_settings",
         "description": (
             "URL path the dashboard is served under, e.g. '/stats' gives "
             "http://<host>:<port>/stats/. Takes effect immediately, no "
@@ -62,19 +60,3 @@ _GLOBAL_SETTINGS_FIELDS = [
         ),
     },
 ]
-
-_GLOBAL_SETTINGS_HEADER = {
-    "id": "_global_settings_header",
-    "label": "── Dashboard Settings ──────────────────────",
-    "type": "info",
-    "description": "",
-}
-
-
-def build_plugin_fields(settings: dict) -> list:
-    """Build the full field list based on current settings."""
-    return [_GLOBAL_SETTINGS_HEADER] + _GLOBAL_SETTINGS_FIELDS
-
-
-# Default field list, used as plugin.json fallback
-PLUGIN_FIELDS = build_plugin_fields({})

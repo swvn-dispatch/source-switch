@@ -25,6 +25,12 @@ A mobile-friendly PWA served under a configurable mount path (**Dashboard Mount 
 
 Unlike `multiview`, the mount path here is runtime-configurable (not fixed at build time): the plugin injects the currently-configured path into the served page at request time, so the same build works no matter what path you set it to.
 
+## Dispatcharr requirements
+
+Source Switch requires Dispatcharr `v0.34.0` or newer. It uses manifest version 2 and requires approval for persistent service, network listener, proxy internals, and user data access. Restart Dispatcharr after approving the network-listener capability.
+
+Dispatcharr elects one plugin process to own the dashboard listener. Use **Restart Dashboard Server** after changing the dashboard enabled setting or port. The action reloads Source Switch and the elected service applies the saved settings.
+
 ---
 
 ## Development

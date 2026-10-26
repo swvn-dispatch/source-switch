@@ -14,10 +14,10 @@ rather than baked in at build/start time, so it can be reconfigured live.
 
 import logging
 import socket
+import time
 
 logger = logging.getLogger(__name__)
 
-_server_instance = None
 _dash_api = None
 
 
@@ -41,15 +41,6 @@ def _load_dash_api():
     spec.loader.exec_module(mod)
     _dash_api = mod
     return _dash_api
-
-
-def get_server():
-    return _server_instance
-
-
-def set_server(s):
-    global _server_instance
-    _server_instance = s
 
 
 def _settings() -> dict:
@@ -79,6 +70,7 @@ class SourceSwitchServer:
         self.host = host
         self.port = port
         self._server = None
+        self._listener = None
         self._greenlet = None
         self.running = False
 
@@ -195,16 +187,7 @@ class SourceSwitchServer:
     def start(self) -> bool:
         if self.running:
             logger.warning("Source Switch server is already running")
-            return False
-
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind((self.host, self.port))
-            sock.close()
-        except OSError as e:
-            logger.info(f"Source Switch: port {self.port} already taken, skipping ({e})")
-            return False
+            return True
 
         try:
             from gevent import pywsgi
@@ -213,26 +196,59 @@ class SourceSwitchServer:
             logger.error("gevent is not installed; cannot start Source Switch server")
             return False
 
-        def _run():
+        listener = None
+        last_error = None
+        for attempt in range(1, 4):
             try:
-                self._server = pywsgi.WSGIServer(
-                    (self.host, self.port), self.wsgi_app, log=None,
-                )
-                self.running = True
-                set_server(self)
-                self._server.serve_forever()
+                listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                listener.bind((self.host, self.port))
+                listener.listen(128)
+                break
             except OSError as e:
-                # EADDRINUSE here means a concurrent worker won the race between
-                # our test-bind above and this re-bind -- expected on multi-worker
-                # startup, not an error.
-                logger.info(f"Source Switch: port {self.port} taken by concurrent worker ({e})")
-            except Exception as e:  # noqa: BLE001
-                logger.error(f"Source Switch server crashed: {e}", exc_info=True)
-            finally:
-                self.running = False
+                last_error = e
+                if listener:
+                    listener.close()
+                    listener = None
+                if attempt < 3:
+                    logger.info(
+                        "Source Switch: port %s unavailable during leader handoff; retrying (%s)",
+                        self.port,
+                        e,
+                    )
+                    time.sleep(0.5)
 
-        self._greenlet = _gevent.spawn(_run)
-        return True
+        if listener is None:
+            logger.info("Source Switch: port %s is unavailable (%s)", self.port, last_error)
+            return False
+
+        self._listener = listener
+        self.running = True
+
+        try:
+            def _run():
+                try:
+                    self._server = pywsgi.WSGIServer(self._listener, self.wsgi_app, log=None)
+                    self._server.serve_forever()
+                except OSError as e:
+                    logger.info("Source Switch server stopped during startup (%s)", e)
+                except Exception as e:  # noqa: BLE001
+                    logger.error(f"Source Switch server crashed: {e}", exc_info=True)
+                finally:
+                    self.running = False
+                    self._server = None
+                    if self._listener:
+                        self._listener.close()
+                        self._listener = None
+
+            self._greenlet = _gevent.spawn(_run)
+            return True
+        except Exception as e:  # noqa: BLE001
+            self.running = False
+            self._listener.close()
+            self._listener = None
+            logger.error(f"Source Switch server could not start: {e}", exc_info=True)
+            return False
 
     def stop(self):
         if self._server:
@@ -240,8 +256,13 @@ class SourceSwitchServer:
                 self._server.stop()
             except Exception:
                 pass
+        if self._listener:
+            try:
+                self._listener.close()
+            except OSError:
+                pass
+            self._listener = None
         self.running = False
-        set_server(None)
         logger.info("Source Switch server stopped")
 
     def is_running(self) -> bool:

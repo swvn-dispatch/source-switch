@@ -5,7 +5,14 @@
   "author": "sethwv",
 
   "version": "0.1.0",
-  "min_dispatcharr_version": "v0.27.0",
+  "manifest_version": 2,
+  "min_dispatcharr_version": "v0.34.0",
+  "capabilities": [
+    "persistent_service",
+    "network_listener",
+    "proxy_internals",
+    "user_data"
+  ],
 
   "repo_url": "https://github.com/swvn-dispatch/source-switch",
   "help_url": "https://github.com/swvn-dispatch/source-switch"
