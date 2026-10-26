@@ -106,6 +106,11 @@ class LifecycleTests(unittest.TestCase):
         plugin.on_leader_acquired({"settings": {"dash_enabled": "disabled"}})
         self.assertEqual(self.created_servers, [])
 
+    def test_missing_or_null_enabled_setting_uses_the_enabled_default(self):
+        plugin = self.plugin_module.Plugin()
+        plugin.on_leader_acquired({"settings": {"dash_enabled": None}})
+        self.assertEqual(len(self.created_servers), 1)
+
     def test_restart_action_requests_single_plugin_reload(self):
         calls = []
 

@@ -104,7 +104,7 @@ class SourceSwitchServer:
     def _route(self, path, environ, start_response):
         dash_path = _normalized_dash_path()
 
-        if _settings().get("dash_enabled", "disabled") != "enabled":
+        if _settings().get("dash_enabled") == "disabled":
             start_response("404 Not Found", [("Content-Type", "text/plain")])
             return [b"Not Found\n"]
 

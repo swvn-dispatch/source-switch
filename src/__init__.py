@@ -156,7 +156,7 @@ class Plugin:
     def on_leader_acquired(self, context: dict):
         """Start the listener only while this plugin instance owns leadership."""
         settings = (context or {}).get("settings") or {}
-        if settings.get("dash_enabled", "enabled") != "enabled":
+        if settings.get("dash_enabled") == "disabled":
             logger.info("Source Switch dashboard is disabled; elected service will not start")
             self._stop_server()
             return
