@@ -77,8 +77,6 @@ class SourceSwitchServer:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self._server = None
-        self.running = False
 
     # ------------------------------------------------------------------ WSGI
 
@@ -192,11 +190,12 @@ class SourceSwitchServer:
 
     def run(self, stop_event):
         """Run until Dispatcharr's persistent-service runner requests shutdown."""
+        server = None
         for attempt in range(1, 4):
             if stop_event.is_set():
                 return
             try:
-                self._server = make_server(
+                server = make_server(
                     self.host,
                     self.port,
                     self.wsgi_app,
@@ -212,25 +211,13 @@ class SourceSwitchServer:
                 stop_event.wait(0.5)
 
         try:
-            self._server.timeout = 0.5
-            self.running = True
+            server.timeout = 0.5
             logger.info("Source Switch dashboard server started on http://%s:%s/", self.host, self.port)
             while not stop_event.is_set():
-                self._server.handle_request()
+                server.handle_request()
         except Exception as e:  # noqa: BLE001
             logger.error(f"Source Switch server crashed: {e}", exc_info=True)
         finally:
-            self.stop()
-
-    def stop(self):
-        if self._server:
-            try:
-                self._server.stop()
-            except Exception:
-                pass
-        self._server = None
-        self.running = False
-        logger.info("Source Switch server stopped")
-
-    def is_running(self) -> bool:
-        return self.running
+            if server:
+                server.server_close()
+            logger.info("Source Switch server stopped")

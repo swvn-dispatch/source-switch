@@ -27,13 +27,9 @@ class FakeServer:
         self.host = host
         self.port = port
         self.service_target = None
-        self.stopped = False
 
     def run(self, stop_event):
         self.service_target = stop_event
-
-    def stop(self):
-        self.stopped = True
 
 
 class ManifestTests(unittest.TestCase):
@@ -85,7 +81,7 @@ class LifecycleTests(unittest.TestCase):
         self.plugin_module.Plugin()
         self.assertEqual(self.created_servers, [])
 
-    def test_leadership_starts_once_and_loss_stops_owned_server(self):
+    def test_leadership_registers_once_and_releases_service_reference(self):
         plugin = self.plugin_module.Plugin()
         context = {
             "settings": {"dash_enabled": "enabled", "dash_port": 9393},
@@ -101,7 +97,7 @@ class LifecycleTests(unittest.TestCase):
 
         plugin.on_leader_lost(context)
         plugin.on_leader_lost(context)
-        self.assertTrue(self.created_servers[0].stopped)
+        self.assertIsNone(plugin._dashboard_server)
 
     def test_disabled_leader_does_not_start_listener(self):
         plugin = self.plugin_module.Plugin()

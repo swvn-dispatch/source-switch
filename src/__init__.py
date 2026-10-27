@@ -158,49 +158,35 @@ class Plugin:
         settings = (context or {}).get("settings") or {}
         if settings.get("dash_enabled") == "disabled":
             logger.info("Source Switch dashboard is disabled; elected service will not start")
-            self._stop_server()
             return
 
-        result = self._start_server(settings, context["start_service"])
-        if result["status"] == "success":
-            logger.info("Source Switch elected dashboard service started: %s", result["message"])
-        else:
-            logger.warning("Source Switch elected dashboard service failed to start: %s", result["message"])
+        self._register_service(settings, context["start_service"])
 
     def on_leader_lost(self, context: dict):
-        """Release this process's listener when Dispatcharr revokes leadership."""
-        self._stop_server()
+        """Release the local reference after Dispatcharr stops the service."""
+        self._dashboard_server = None
 
-    def _start_server(self, settings: dict, start_service) -> dict:
+    def _register_service(self, settings: dict, start_service):
+        if self._dashboard_server:
+            logger.info(
+                "Source Switch dashboard service is already registered on port %s",
+                self._dashboard_server.port,
+            )
+            return
+
         cfg = _config()
         settings = settings or {}
         port = int(settings.get("dash_port") or cfg.DEFAULT_SERVER_PORT)
-
-        if self._dashboard_server:
-            return {
-                "status": "success",
-                "message": f"Source Switch dashboard service is already registered on port {self._dashboard_server.port}",
-            }
-
         server = _server().SourceSwitchServer(host="0.0.0.0", port=port)
         try:
             start_service(server.run, name="dashboard")
             self._dashboard_server = server
-            return {
-                "status": "success",
-                "message": f"Source Switch dashboard service registered on http://0.0.0.0:{port}/",
-            }
+            logger.info("Source Switch dashboard service registered on http://0.0.0.0:%s/", port)
         except Exception as e:
-            return {"status": "error", "message": f"Could not register dashboard service: {e}"}
-
-    def _stop_server(self):
-        server, self._dashboard_server = self._dashboard_server, None
-        if server:
-            logger.info("Stopping Source Switch dashboard server")
-            server.stop()
+            logger.warning("Could not register Source Switch dashboard service: %s", e)
 
     # Lifecycle
 
     def stop(self, context: dict):
-        """Called when the plugin is disabled or Dispatcharr shuts down."""
-        self._stop_server()
+        """Called after Dispatcharr stops the managed service."""
+        self._dashboard_server = None
