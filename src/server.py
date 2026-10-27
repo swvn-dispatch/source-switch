@@ -13,28 +13,20 @@ rather than baked in at build/start time, so it can be reconfigured live.
 """
 
 import logging
-import socket
-import threading
-import time
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 logger = logging.getLogger(__name__)
 
 _dash_api = None
 
 
-def _native_threading_class(name):
-    try:
-        import gevent.monkey
-
-        if gevent.monkey.is_module_patched("threading"):
-            return gevent.monkey.get_original("threading", name)
-    except ImportError:
+class _DashboardRequestHandler(WSGIRequestHandler):
+    def log_message(self, format, *args):
         pass
-    return getattr(threading, name)
 
 
-def _native_thread(target):
-    return _native_threading_class("Thread")(target=target)
+class _DashboardWSGIServer(WSGIServer):
+    allow_reuse_address = True
 
 
 def _load_dash_api():
@@ -86,9 +78,6 @@ class SourceSwitchServer:
         self.host = host
         self.port = port
         self._server = None
-        self._listener = None
-        self._greenlet = None
-        self._shutdown_event = _native_threading_class("Event")()
         self.running = False
 
     # ------------------------------------------------------------------ WSGI
@@ -201,87 +190,45 @@ class SourceSwitchServer:
 
     # ------------------------------------------------------------- lifecycle
 
-    def start(self) -> bool:
-        if self.running:
-            logger.warning("Source Switch server is already running")
-            return True
-
-        try:
-            from gevent import pywsgi
-        except ImportError:
-            logger.error("gevent is not installed; cannot start Source Switch server")
-            return False
-
-        last_error = None
+    def run(self, stop_event):
+        """Run until Dispatcharr's persistent-service runner requests shutdown."""
         for attempt in range(1, 4):
+            if stop_event.is_set():
+                return
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-                    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    listener.bind((self.host, self.port))
+                self._server = make_server(
+                    self.host,
+                    self.port,
+                    self.wsgi_app,
+                    server_class=_DashboardWSGIServer,
+                    handler_class=_DashboardRequestHandler,
+                )
                 break
             except OSError as e:
-                last_error = e
-                if attempt < 3:
-                    logger.info(
-                        "Source Switch: port %s unavailable during leader handoff; retrying (%s)",
-                        self.port,
-                        e,
-                    )
-                    time.sleep(0.5)
-
-        else:
-            logger.info("Source Switch: port %s is unavailable (%s)", self.port, last_error)
-            return False
-
-        self.running = True
-        self._shutdown_event.clear()
+                if attempt == 3:
+                    logger.info("Source Switch: port %s is unavailable (%s)", self.port, e)
+                    return
+                logger.info("Source Switch: port %s unavailable during leader handoff; retrying (%s)", self.port, e)
+                stop_event.wait(0.5)
 
         try:
-            def _run():
-                try:
-                    if self._shutdown_event.is_set():
-                        return
-                    self._server = pywsgi.WSGIServer((self.host, self.port), self.wsgi_app, log=None)
-                    self._server.serve_forever()
-                except OSError as e:
-                    logger.info("Source Switch server stopped during startup (%s)", e)
-                except Exception as e:  # noqa: BLE001
-                    logger.error(f"Source Switch server crashed: {e}", exc_info=True)
-                finally:
-                    self.running = False
-                    self._server = None
-                    if self._listener:
-                        self._listener.close()
-                        self._listener = None
-
-            self._greenlet = _native_thread(_run)
-            self._greenlet.name = "source-switch-dashboard"
-            self._greenlet.daemon = True
-            self._greenlet.start()
-            return True
+            self._server.timeout = 0.5
+            self.running = True
+            logger.info("Source Switch dashboard server started on http://%s:%s/", self.host, self.port)
+            while not stop_event.is_set():
+                self._server.handle_request()
         except Exception as e:  # noqa: BLE001
-            self.running = False
-            self._listener.close()
-            self._listener = None
-            logger.error(f"Source Switch server could not start: {e}", exc_info=True)
-            return False
+            logger.error(f"Source Switch server crashed: {e}", exc_info=True)
+        finally:
+            self.stop()
 
     def stop(self):
-        self._shutdown_event.set()
         if self._server:
             try:
                 self._server.stop()
             except Exception:
                 pass
-        if self._listener:
-            try:
-                self._listener.close()
-            except OSError:
-                pass
-            self._listener = None
-        if self._greenlet and self._greenlet is not threading.current_thread():
-            self._greenlet.join(timeout=5)
-        self._greenlet = None
+        self._server = None
         self.running = False
         logger.info("Source Switch server stopped")
 

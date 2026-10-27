@@ -26,19 +26,14 @@ class FakeServer:
     def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.started = False
+        self.service_target = None
         self.stopped = False
 
-    def start(self):
-        self.started = True
-        return True
+    def run(self, stop_event):
+        self.service_target = stop_event
 
     def stop(self):
         self.stopped = True
-        self.started = False
-
-    def is_running(self):
-        return self.started
 
 
 class ManifestTests(unittest.TestCase):
@@ -76,11 +71,15 @@ class LifecycleTests(unittest.TestCase):
         server_module = types.SimpleNamespace(SourceSwitchServer=self._create_server)
         self.plugin_module._server = lambda: server_module
         self.plugin_module._config = lambda: types.SimpleNamespace(DEFAULT_SERVER_PORT=9294)
+        self.started_services = []
 
     def _create_server(self, host, port):
         server = FakeServer(host, port)
         self.created_servers.append(server)
         return server
+
+    def _start_service(self, target, *, name):
+        self.started_services.append((target, name))
 
     def test_construction_does_not_start_a_listener(self):
         self.plugin_module.Plugin()
@@ -88,14 +87,17 @@ class LifecycleTests(unittest.TestCase):
 
     def test_leadership_starts_once_and_loss_stops_owned_server(self):
         plugin = self.plugin_module.Plugin()
-        context = {"settings": {"dash_enabled": "enabled", "dash_port": 9393}}
+        context = {
+            "settings": {"dash_enabled": "enabled", "dash_port": 9393},
+            "start_service": self._start_service,
+        }
 
         plugin.on_leader_acquired(context)
         plugin.on_leader_acquired(context)
 
         self.assertEqual(len(self.created_servers), 1)
-        self.assertTrue(self.created_servers[0].started)
         self.assertEqual(self.created_servers[0].port, 9393)
+        self.assertEqual(self.started_services, [(self.created_servers[0].run, "dashboard")])
 
         plugin.on_leader_lost(context)
         plugin.on_leader_lost(context)
@@ -103,12 +105,12 @@ class LifecycleTests(unittest.TestCase):
 
     def test_disabled_leader_does_not_start_listener(self):
         plugin = self.plugin_module.Plugin()
-        plugin.on_leader_acquired({"settings": {"dash_enabled": "disabled"}})
+        plugin.on_leader_acquired({"settings": {"dash_enabled": "disabled"}, "start_service": self._start_service})
         self.assertEqual(self.created_servers, [])
 
     def test_missing_or_null_enabled_setting_uses_the_enabled_default(self):
         plugin = self.plugin_module.Plugin()
-        plugin.on_leader_acquired({"settings": {"dash_enabled": None}})
+        plugin.on_leader_acquired({"settings": {"dash_enabled": None}, "start_service": self._start_service})
         self.assertEqual(len(self.created_servers), 1)
 
     def test_restart_action_requests_single_plugin_reload(self):

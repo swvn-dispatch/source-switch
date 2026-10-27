@@ -161,7 +161,7 @@ class Plugin:
             self._stop_server()
             return
 
-        result = self._start_server(settings)
+        result = self._start_server(settings, context["start_service"])
         if result["status"] == "success":
             logger.info("Source Switch elected dashboard service started: %s", result["message"])
         else:
@@ -171,28 +171,27 @@ class Plugin:
         """Release this process's listener when Dispatcharr revokes leadership."""
         self._stop_server()
 
-    def _start_server(self, settings: dict = None) -> dict:
+    def _start_server(self, settings: dict, start_service) -> dict:
         cfg = _config()
         settings = settings or {}
         port = int(settings.get("dash_port") or cfg.DEFAULT_SERVER_PORT)
 
-        if self._dashboard_server and self._dashboard_server.is_running():
+        if self._dashboard_server:
             return {
                 "status": "success",
-                "message": f"Source Switch dashboard server is already running on port {self._dashboard_server.port}",
+                "message": f"Source Switch dashboard service is already registered on port {self._dashboard_server.port}",
             }
 
         server = _server().SourceSwitchServer(host="0.0.0.0", port=port)
-        if server.start():
+        try:
+            start_service(server.run, name="dashboard")
             self._dashboard_server = server
             return {
                 "status": "success",
-                "message": f"Source Switch dashboard server started on http://0.0.0.0:{port}/",
+                "message": f"Source Switch dashboard service registered on http://0.0.0.0:{port}/",
             }
-        return {
-            "status": "error",
-            "message": f"Failed to start server on port {port}; port may be in use",
-        }
+        except Exception as e:
+            return {"status": "error", "message": f"Could not register dashboard service: {e}"}
 
     def _stop_server(self):
         server, self._dashboard_server = self._dashboard_server, None
