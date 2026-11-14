@@ -27,7 +27,7 @@ Unlike `multiview`, the mount path here is runtime-configurable (not fixed at bu
 
 ## Dispatcharr requirements
 
-Source Switch requires Dispatcharr `v0.34.0` or newer. It uses manifest version 2 and requires approval for persistent service, network listener, proxy internals, and user data access. Restart Dispatcharr after approving the network-listener capability.
+Source Switch requires Dispatcharr `v0.34.0` or newer. Until that release is available, a current development build with manifest v2 and post-action plugin reload support is required. It requires approval for persistent service, network listener, proxy internals, and user data access. Restart Dispatcharr after approving the network-listener capability.
 
 Dispatcharr elects one plugin process to own the dashboard listener. Use **Restart Dashboard Server** after changing the dashboard enabled setting or port. The action reloads Source Switch and the elected service applies the saved settings.
 

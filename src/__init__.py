@@ -109,16 +109,7 @@ class Plugin:
     description = _PLUGIN_CONFIG["description"]
     version     = _PLUGIN_CONFIG["version"]
     author      = _PLUGIN_CONFIG["author"]
-    actions = [
-        {
-            "id": "restart_dash",
-            "label": "Restart Dashboard Server",
-            "description": "Reload Source Switch so the elected dashboard service applies the current enabled and port settings.",
-            "button_label": "Restart Dashboard Server",
-            "button_variant": "filled",
-            "button_color": "blue",
-        },
-    ]
+    actions = _PLUGIN_CONFIG["actions"]
 
     def __init__(self):
         self._dashboard_server = None
@@ -138,16 +129,10 @@ class Plugin:
 
     def run(self, action: str, params: dict, context: dict):
         if action == "restart_dash":
-            try:
-                from apps.plugins.loader import PluginManager
-
-                PluginManager.get().reload_plugin(PLUGIN_DB_KEY)
-            except Exception as e:
-                logger.error("Source Switch dashboard reload request failed", exc_info=True)
-                return {"status": "error", "message": f"Could not request dashboard reload: {e}"}
             return {
-                "status": "success",
+                "status": "ok",
                 "message": "Dashboard reload requested. The elected service will apply the current settings shortly.",
+                "_dispatcharr": {"refresh": "plugin"},
             }
         return {"status": "error", "message": f"Unknown action: {action}"}
 
@@ -155,7 +140,8 @@ class Plugin:
 
     def on_leader_acquired(self, context: dict):
         """Start the listener only while this plugin instance owns leadership."""
-        settings = (context or {}).get("settings") or {}
+        get_settings = context.get("get_settings")
+        settings = (get_settings() if get_settings else context.get("settings")) or {}
         if settings.get("dash_enabled") == "disabled":
             logger.info("Source Switch dashboard is disabled; elected service will not start")
             return
@@ -178,12 +164,9 @@ class Plugin:
         settings = settings or {}
         port = int(settings.get("dash_port") or cfg.DEFAULT_SERVER_PORT)
         server = _server().SourceSwitchServer(host="0.0.0.0", port=port)
-        try:
-            start_service(server.run, name="dashboard")
-            self._dashboard_server = server
-            logger.info("Source Switch dashboard service registered on http://0.0.0.0:%s/", port)
-        except Exception as e:
-            logger.warning("Could not register Source Switch dashboard service: %s", e)
+        start_service(server.run, name="dashboard")
+        self._dashboard_server = server
+        logger.info("Source Switch dashboard service registered on http://0.0.0.0:%s/", port)
 
     # Lifecycle
 

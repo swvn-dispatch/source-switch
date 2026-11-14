@@ -1,6 +1,6 @@
 """Source Switch dashboard server.
 
-Embeds a gevent WSGI server (own port) inside the Dispatcharr plugin process,
+Embeds a WSGI server (own port) inside the Dispatcharr plugin process,
 since Dispatcharr's plugin system has no route/static-serving hook of its own.
 Serves:
 
@@ -205,8 +205,8 @@ class SourceSwitchServer:
                 break
             except OSError as e:
                 if attempt == 3:
-                    logger.info("Source Switch: port %s is unavailable (%s)", self.port, e)
-                    return
+                    logger.error("Source Switch: port %s is unavailable (%s)", self.port, e)
+                    raise
                 logger.info("Source Switch: port %s unavailable during leader handoff; retrying (%s)", self.port, e)
                 stop_event.wait(0.5)
 
@@ -217,6 +217,7 @@ class SourceSwitchServer:
                 server.handle_request()
         except Exception as e:  # noqa: BLE001
             logger.error(f"Source Switch server crashed: {e}", exc_info=True)
+            raise
         finally:
             if server:
                 server.server_close()

@@ -4,7 +4,7 @@
 # Plugin name and output filename are derived entirely from src/plugin.json,
 # so this script requires no plugin-specific edits.
 #
-# Dispatcharr 0.19.0 Compatibility:
+# Plugin package layout:
 # - The src/ folder contains the plugin source code
 # - src/plugin.json contains the plugin manifest
 # - The build process packages src/ as {slug}/ inside the zip
@@ -40,7 +40,7 @@ fi
 
 if [ ! -f "$SRC_DIR/plugin.json" ]; then
     echo "Error: plugin.json not found in $SRC_DIR"
-    echo "This is required for Dispatcharr 0.19.0 compatibility"
+    echo "This is required for plugin metadata and packaging"
     exit 1
 fi
 

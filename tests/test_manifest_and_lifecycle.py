@@ -6,6 +6,7 @@ import sys
 import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +58,7 @@ class ManifestTests(unittest.TestCase):
             "collapsed": False,
         })
         self.assertTrue(all(field["section"] == "dashboard_settings" for field in fields[1:]))
-        self.assertEqual(plugin.actions[0]["id"], "restart_dash")
+        self.assertEqual(plugin.actions, plugin_module._PLUGIN_CONFIG["actions"])
 
 
 class LifecycleTests(unittest.TestCase):
@@ -98,6 +99,8 @@ class LifecycleTests(unittest.TestCase):
         plugin.on_leader_lost(context)
         plugin.on_leader_lost(context)
         self.assertIsNone(plugin._dashboard_server)
+        plugin.on_leader_acquired(context)
+        self.assertEqual(len(self.created_servers), 2)
 
     def test_disabled_leader_does_not_start_listener(self):
         plugin = self.plugin_module.Plugin()
@@ -110,30 +113,32 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(len(self.created_servers), 1)
 
     def test_restart_action_requests_single_plugin_reload(self):
-        calls = []
+        result = self.plugin_module.Plugin().run("restart_dash", {}, {})
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["_dispatcharr"], {"refresh": "plugin"})
 
-        class Manager:
-            @classmethod
-            def get(cls):
-                return cls()
+    def test_leadership_uses_current_settings(self):
+        plugin = self.plugin_module.Plugin()
+        plugin.on_leader_acquired({
+            "settings": {"dash_port": 9294},
+            "get_settings": lambda: {"dash_port": 9494},
+            "start_service": self._start_service,
+        })
+        self.assertEqual(self.created_servers[0].port, 9494)
 
-            def reload_plugin(self, key):
-                calls.append(key)
+    def test_service_registration_failure_is_propagated(self):
+        plugin = self.plugin_module.Plugin()
+        def fail(*args, **kwargs):
+            raise RuntimeError("registration failed")
+        with self.assertRaisesRegex(RuntimeError, "registration failed"):
+            plugin.on_leader_acquired({"settings": {}, "start_service": fail})
+        self.assertIsNone(plugin._dashboard_server)
 
-        apps = types.ModuleType("apps")
-        plugins = types.ModuleType("apps.plugins")
-        loader = types.ModuleType("apps.plugins.loader")
-        loader.PluginManager = Manager
-        old_modules = {key: sys.modules.get(key) for key in ("apps", "apps.plugins", "apps.plugins.loader")}
-        sys.modules.update({"apps": apps, "apps.plugins": plugins, "apps.plugins.loader": loader})
-        try:
-            result = self.plugin_module.Plugin().run("restart_dash", {}, {})
-        finally:
-            for key, old_module in old_modules.items():
-                if old_module is None:
-                    sys.modules.pop(key, None)
-                else:
-                    sys.modules[key] = old_module
-
-        self.assertEqual(calls, ["source_switch"])
-        self.assertEqual(result["status"], "success")
+    def test_bind_failure_is_reported_to_service_runner(self):
+        server_module = load_plugin_module()._server()
+        stop_event = mock.Mock()
+        stop_event.is_set.return_value = False
+        with mock.patch.object(server_module, "make_server", side_effect=OSError("port in use")) as make_server:
+            with self.assertRaisesRegex(OSError, "port in use"):
+                server_module.SourceSwitchServer("0.0.0.0", 9294).run(stop_event)
+        self.assertEqual(make_server.call_count, 3)
