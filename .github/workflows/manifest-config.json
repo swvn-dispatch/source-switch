@@ -1,4 +1,3 @@
 {
-  "aggregator_repo": "swvn-dispatch/plugins",
-  "never_submit_upstream": true
+  "aggregator_repo": "swvn-dispatch/plugins"
 }
