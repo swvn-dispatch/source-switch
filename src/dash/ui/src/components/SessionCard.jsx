@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Group, Text, Badge, Select, Accordion, Stack, ActionIcon, Tooltip, Loader, Center, Image, ThemeIcon } from '@mantine/core';
+import { Card, Group, Text, Badge, Combobox, Input, InputBase, ScrollArea, useCombobox, Accordion, Stack, ActionIcon, Tooltip, Loader, Center, Image, ThemeIcon } from '@mantine/core';
 import { IconUserOff, IconSquareX, IconVideo, IconCloudUpload, IconCheck, IconLoader2, IconPlayerPlay } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { ConfirmModal, resolveStatusColor } from '@swvn-dispatch/dispatch-ui-kit';
@@ -28,6 +28,52 @@ const STATE_COLORS = {
 
 // Matches Dispatcharr's own Stats page badge colors (StreamConnectionCard.jsx)
 const SPEED_OK_THRESHOLD = 1.0;
+
+function SourceSelect({ options, value, onChange, disabled, loading }) {
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+    onDropdownOpen: () => combobox.updateSelectedOptionIndex('active'),
+  });
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <Combobox store={combobox} onOptionSubmit={(option) => { onChange(option); combobox.closeDropdown(); }}>
+      <Combobox.Target>
+        <InputBase
+          component="button"
+          type="button"
+          label="Source"
+          disabled={disabled}
+          rightSection={<Combobox.Chevron />}
+          rightSectionPointerEvents="none"
+          onClick={() => combobox.toggleDropdown()}
+          mb="sm"
+          styles={{ input: { textAlign: 'left', userSelect: 'none', WebkitUserSelect: 'none' } }}
+        >
+          {selected ? selected.label : <Input.Placeholder>{loading ? 'Loading…' : 'Select a source'}</Input.Placeholder>}
+        </InputBase>
+      </Combobox.Target>
+      <Combobox.Dropdown>
+        <Combobox.Options>
+          <ScrollArea.Autosize mah={320} type="scroll">
+            {options.map((option) => (
+              <Combobox.Option value={option.value} key={option.value} active={option.value === value}>
+                <Stack gap={2} py={2} style={{ width: '100%' }}>
+                  <Group justify="space-between" wrap="nowrap" gap="xs">
+                    <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }}>{option.name}</Text>
+                    {option.value === value && <IconCheck size={14} style={{ flexShrink: 0 }} />}
+                  </Group>
+                  {option.provider && <Text size="xs" c="dimmed" truncate>{option.provider}</Text>}
+                  {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" />}
+                </Stack>
+              </Combobox.Option>
+            ))}
+          </ScrollArea.Autosize>
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
+  );
+}
 
 export function StreamStatsBadges({
   stats,
@@ -356,46 +402,12 @@ export default function SessionCard({
         </Group>
       </Group>
 
-      <Select
-        label="Source"
-        name={`source-switch-stream-${session.channel_id}`}
-        autoComplete="off"
-        autoCapitalize="none"
-        autoCorrect="off"
-        spellCheck={false}
-        placeholder={streams === null ? 'Loading…' : 'Select a source'}
-        data={streamOptions}
+      <SourceSelect
+        options={streamOptions}
         value={currentStreamId}
         onChange={handleSwitch}
         disabled={sourceDisabled || switching || streams === null}
-        mb="sm"
-        maxDropdownHeight={320}
-        styles={{
-          input: { userSelect: 'none', WebkitUserSelect: 'none' },
-          option: { userSelect: 'none', WebkitUserSelect: 'none' },
-        }}
-        renderOption={({ option, checked }) => (
-          <Stack gap={2} py={2} style={{ width: '100%' }}>
-            <Group justify="space-between" wrap="nowrap" gap="xs">
-              <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }}>
-                {option.name}
-              </Text>
-              {checked && <IconCheck size={14} style={{ flexShrink: 0 }} />}
-            </Group>
-            {option.provider && (
-              <Text size="xs" c="dimmed" truncate>
-                {option.provider}
-              </Text>
-            )}
-            {option.stats && (
-              <StreamStatsBadges
-                stats={option.stats}
-                size="xs"
-                justify="flex-start"
-              />
-            )}
-          </Stack>
-        )}
+        loading={streams === null}
       />
 
       <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>

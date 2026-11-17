@@ -136,3 +136,10 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "port in use"):
                 server_module.SourceSwitchServer("0.0.0.0", 9294).run(stop_event)
         self.assertEqual(make_server.call_count, 3)
+
+    def test_dashboard_path_default_and_saved_setting(self):
+        server_module = load_plugin_module()._server()
+        with mock.patch.object(server_module, "_settings", return_value={}):
+            self.assertEqual(server_module._normalized_dash_path(), "/switch")
+        with mock.patch.object(server_module, "_settings", return_value={"dash_path": "/stats"}):
+            self.assertEqual(server_module._normalized_dash_path(), "/stats")

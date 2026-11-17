@@ -8,7 +8,7 @@ Serves:
   *    {dash_path}/api/*             JSON API (see dash/api.py)
   GET  {dash_path}[/*]               Static SPA (see dash/api.py::serve_static)
 
-`dash_path` (default "/stats") is read from plugin settings on every request
+`dash_path` (default "/switch") is read from plugin settings on every request
 rather than baked in at build/start time, so it can be reconfigured live.
 """
 
@@ -65,8 +65,8 @@ def _settings() -> dict:
 
 
 def _normalized_dash_path() -> str:
-    """Return the configured mount path, normalized to e.g. '/stats' (no trailing slash), or '' for root."""
-    raw = (_settings().get("dash_path") or "/stats").strip()
+    """Return the configured mount path, normalized to e.g. '/switch' (no trailing slash), or '' for root."""
+    raw = (_settings().get("dash_path") or "/switch").strip()
     if not raw.startswith("/"):
         raw = "/" + raw
     raw = raw.rstrip("/")

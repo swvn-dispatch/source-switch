@@ -14,7 +14,7 @@ This project is maintained in my spare time. If it's saved you some headaches, a
 
 ## Dashboard
 
-A mobile-friendly PWA served under a configurable mount path (**Dashboard Mount Path** setting, default `/stats`). **Enabled by default**; disable it via the **Web Dashboard** setting if you don't want it running. Log in with your Dispatcharr credentials to:
+A mobile-friendly PWA served under a configurable mount path (**Dashboard Mount Path** setting, default `/switch`). **Enabled by default**; disable it via the **Web Dashboard** setting if you don't want it running. Log in with your Dispatcharr credentials to:
 
 - See active live, VOD, and catch-up connections, including live uptime, bitrate, and stream stats (resolution, codec, FPS).
 - Switch a running channel's source live, without stopping playback for connected clients.

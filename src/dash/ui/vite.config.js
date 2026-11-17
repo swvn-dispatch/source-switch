@@ -23,12 +23,12 @@ export default defineConfig(({ command }) => ({
   build: { outDir: '../static', emptyOutDir: true },
   server: {
     // Dev-only: the real server mounts the API under the configured
-    // dash_path (default "/stats"), so rewrite proxied requests to match.
+    // dash_path (default "/switch"), so rewrite proxied requests to match.
     // Adjust the rewrite prefix here if you're testing a non-default path.
     proxy: process.env.VITE_MOCK_API === 'true' ? undefined : {
       '/api': {
         target: 'http://localhost:9294',
-        rewrite: (path) => `/stats${path}`,
+        rewrite: (path) => `/switch${path}`,
       },
     },
   },

@@ -1,7 +1,7 @@
 """Shared Source Switch configuration defaults."""
 
 DEFAULT_SERVER_PORT = 9294
-DEFAULT_DASH_PATH = "/stats"
+DEFAULT_DASH_PATH = "/switch"
 DEFAULT_POLL_SECS = 5
 
 
@@ -23,12 +23,9 @@ PLUGIN_FIELDS = [
         ],
         "section": "dashboard_settings",
         "description": (
-            "Serves a mobile-friendly PWA dashboard for viewing live stream "
-            "sessions, connected clients, and swapping sources. On by "
-            "default. You may need to expose the configured port in your "
-            "docker-compose.yml to reach it from outside the container. "
-            "After changing this setting or the port, save your settings and "
-            "reload the Source Switch plugin to apply them."
+            "Enable the dashboard to view sessions and clients and switch "
+            "live sources. Enabled by default. Save and reload the Source "
+            "Switch plugin after changing this setting."
         ),
     },
     {
@@ -41,8 +38,12 @@ PLUGIN_FIELDS = [
         "placeholder": str(DEFAULT_SERVER_PORT),
         "section": "dashboard_settings",
         "description": (
-            "TCP port the embedded dashboard server listens on. Save your "
-            "settings and reload the Source Switch plugin after changing it."
+            "Port the dashboard listens on inside Dispatcharr (default 9294). "
+            "For Docker, you may need to add a port mapping such as "
+            "'9294:9294' under ports in docker-compose.yml and recreate the "
+            "container. If you change this port, update the mapping to match "
+            "the container port. Save and reload the Source Switch plugin "
+            "after changing this setting."
         ),
     },
     {
@@ -53,9 +54,10 @@ PLUGIN_FIELDS = [
         "placeholder": DEFAULT_DASH_PATH,
         "section": "dashboard_settings",
         "description": (
-            "URL path the dashboard is served under, e.g. '/stats' gives "
-            "http://<host>:<port>/stats/. Takes effect immediately, no "
-            "restart needed."
+            "Path used to open the dashboard. For example, the default "
+            "'/switch' gives http://<host>:<port>/switch/. Use the host port "
+            "from your Docker port mapping if it differs from the dashboard "
+            "port. Changes take effect immediately after saving."
         ),
     },
 ]

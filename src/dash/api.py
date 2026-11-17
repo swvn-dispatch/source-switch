@@ -415,7 +415,7 @@ def handle_vod_logo(environ, start_response, content_type, content_uuid):
 def serve_static(mount_path: str, sub_path: str, start_response):
     """Serve files from dash/static/, under a runtime-configurable mount path.
 
-    mount_path: normalized prefix the server routed on, e.g. "/stats" (or "").
+    mount_path: normalized prefix the server routed on, e.g. "/switch" (or "").
     sub_path: request path relative to mount_path, e.g. "/", "/assets/index-x.js".
     """
     rel = sub_path.lstrip("/") or "index.html"
