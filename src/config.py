@@ -27,8 +27,8 @@ PLUGIN_FIELDS = [
             "sessions, connected clients, and swapping sources. On by "
             "default. You may need to expose the configured port in your "
             "docker-compose.yml to reach it from outside the container. "
-            "After changing this setting or the port, use the Restart "
-            "Dashboard Server action or restart Dispatcharr to apply it."
+            "After changing this setting or the port, save your settings and "
+            "reload the Source Switch plugin to apply them."
         ),
     },
     {
@@ -41,9 +41,8 @@ PLUGIN_FIELDS = [
         "placeholder": str(DEFAULT_SERVER_PORT),
         "section": "dashboard_settings",
         "description": (
-            "TCP port the embedded dashboard server listens on. Use the "
-            "Restart Dashboard Server action or restart Dispatcharr after "
-            "changing it."
+            "TCP port the embedded dashboard server listens on. Save your "
+            "settings and reload the Source Switch plugin after changing it."
         ),
     },
     {

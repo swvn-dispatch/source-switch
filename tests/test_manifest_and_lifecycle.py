@@ -44,7 +44,7 @@ class ManifestTests(unittest.TestCase):
             ["persistent_service", "network_listener", "proxy_internals", "user_data"],
         )
         self.assertNotIn("fields", manifest)
-        self.assertEqual(manifest["actions"][0]["id"], "restart_dash")
+        self.assertFalse(manifest.get("actions"))
 
     def test_runtime_fields_use_a_collapsible_dashboard_section(self):
         plugin_module = load_plugin_module()
@@ -58,7 +58,6 @@ class ManifestTests(unittest.TestCase):
             "collapsed": False,
         })
         self.assertTrue(all(field["section"] == "dashboard_settings" for field in fields[1:]))
-        self.assertEqual(plugin.actions, plugin_module._PLUGIN_CONFIG["actions"])
 
 
 class LifecycleTests(unittest.TestCase):
@@ -111,11 +110,6 @@ class LifecycleTests(unittest.TestCase):
         plugin = self.plugin_module.Plugin()
         plugin.on_leader_acquired({"settings": {"dash_enabled": None}, "start_service": self._start_service})
         self.assertEqual(len(self.created_servers), 1)
-
-    def test_restart_action_requests_single_plugin_reload(self):
-        result = self.plugin_module.Plugin().run("restart_dash", {}, {})
-        self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["_dispatcharr"], {"refresh": "plugin"})
 
     def test_leadership_uses_current_settings(self):
         plugin = self.plugin_module.Plugin()

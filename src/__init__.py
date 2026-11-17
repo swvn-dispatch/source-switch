@@ -109,7 +109,6 @@ class Plugin:
     description = _PLUGIN_CONFIG["description"]
     version     = _PLUGIN_CONFIG["version"]
     author      = _PLUGIN_CONFIG["author"]
-    actions = _PLUGIN_CONFIG["actions"]
 
     def __init__(self):
         self._dashboard_server = None
@@ -124,17 +123,6 @@ class Plugin:
     def fields(self):
         """Return the runtime settings schema, including its UI section."""
         return _config().PLUGIN_FIELDS
-
-    # Action dispatcher
-
-    def run(self, action: str, params: dict, context: dict):
-        if action == "restart_dash":
-            return {
-                "status": "ok",
-                "message": "Dashboard reload requested. The elected service will apply the current settings shortly.",
-                "_dispatcharr": {"refresh": "plugin"},
-            }
-        return {"status": "error", "message": f"Unknown action: {action}"}
 
     # Elected persistent-service lifecycle
 
