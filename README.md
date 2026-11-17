@@ -49,4 +49,4 @@ Run `npm run dev:mock` to preview the dashboard with reusable live, movie,
 series, and catch-up fixture data. The mock accepts any username and password
 and does not require Dispatcharr to be running.
 
-`./package.sh` (repo root) builds the dashboard and packages the full plugin zip; the release workflow does the same with registry auth wired in.
+`./package.sh` (repo root) builds the dashboard and packages the full plugin zip; CI (`release.yml`, `dev-prerelease.yml`) does the same with registry auth wired in.
