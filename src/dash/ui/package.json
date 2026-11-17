@@ -20,9 +20,13 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react-swc": "^4.1.0",
-    "postcss": "^8.5.3",
+    "postcss": "^8.5.25",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
-    "vite": "^7.1.7"
+    "vite": "^7.3.7"
+  },
+  "overrides": {
+    "postcss-selector-parser": "^7.1.6",
+    "source-map-js": "^1.2.2"
   }
 }

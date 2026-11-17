@@ -23,8 +23,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          tag_lower=$(printf '%s' "$RELEASE_TAG" | tr '[:upper:]' '[:lower:]')
-          if [[ "$EVENT_NAME" == release && "$tag_lower" =~ (^|[._-])dev([._-]|$) ]]; then
+          if [[ "$EVENT_NAME" == release && "${RELEASE_TAG,,}" =~ (^|[._-])dev([._-]|$) ]]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
