@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Group, Progress, Text, Tooltip } from '@mantine/core';
+import { Group, Progress, Stack, Text } from '@mantine/core';
+import TapTooltip from './TapTooltip.jsx';
 
 function clock(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -21,10 +22,14 @@ export default function ProgramTimeline({ programme, session, mode = 'live' }) {
   const progress = mode === 'catchup'
     ? 100
     : Math.min(100, Math.max(0, ((Date.now() - start) / duration) * 100));
-  const details = [programme.sub_title, programme.description].filter(Boolean).join('\n\n');
-
   return (
-    <Tooltip label={details || programme.title} multiline maw={320} withArrow>
+    <TapTooltip label={
+      <Stack gap={4}>
+        <Text size="xs" fw={700}>{programme.title}</Text>
+        {programme.sub_title && <Text size="xs">{programme.sub_title}</Text>}
+        {programme.description && <Text size="xs">{programme.description}</Text>}
+      </Stack>
+    } multiline maw={320} withArrow>
       <div>
         <Group justify="space-between" gap="xs" wrap="nowrap">
           <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>{clock(programme.start_time)}</Text>
@@ -43,6 +48,6 @@ export default function ProgramTimeline({ programme, session, mode = 'live' }) {
           styles={{ section: { animationDuration: '1.25s' } }}
         />
       </div>
-    </Tooltip>
+    </TapTooltip>
   );
 }

@@ -79,8 +79,8 @@ function SourceLabel({ source }) {
 function SourceSelect({ options, value, onChange, disabled, allowSwitch, opened, onClose }) {
   const [audioOpened, setAudioOpened] = useState(false);
   return (
-    <Modal opened={opened} onClose={onClose} title="Sources" trapFocus={!audioOpened} closeOnEscape={!audioOpened} closeOnClickOutside={!audioOpened}>
-      <ScrollArea.Autosize mah={320} type="scroll">
+    <Modal opened={opened} onClose={onClose} title="Sources" trapFocus={!audioOpened} closeOnEscape={!audioOpened} closeOnClickOutside={!audioOpened} styles={{ content: { maxHeight: '75dvh' } }}>
+      <ScrollArea.Autosize mah="calc(75dvh - 80px)" type="scroll">
         {options.length ? options.map((option) => (
               <Group key={option.value} wrap="nowrap" gap="sm" py="xs" justify="space-between">
                 <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>

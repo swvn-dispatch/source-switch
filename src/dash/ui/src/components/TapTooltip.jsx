@@ -1,7 +1,7 @@
 import { cloneElement, useEffect, useRef, useState } from 'react';
 import { Tooltip } from '@mantine/core';
 
-export default function TapTooltip({ label, children }) {
+export default function TapTooltip({ label, children, ...tooltipProps }) {
   const [opened, setOpened] = useState(false);
   const target = useRef(null);
   const pointerFocus = useRef(false);
@@ -16,7 +16,7 @@ export default function TapTooltip({ label, children }) {
   }, [opened]);
 
   return (
-    <Tooltip label={label} opened={opened}>
+    <Tooltip label={label} opened={opened} {...tooltipProps}>
       {cloneElement(children, {
         ref: (node) => {
           target.current = node;
