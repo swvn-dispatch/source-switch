@@ -84,7 +84,7 @@ function SourceSelect({ options, value, onChange, disabled, allowSwitch, opened,
         {options.length ? options.map((option) => (
               <Group key={option.value} wrap="nowrap" gap="sm" py="xs" justify="space-between">
                 <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
-                  <Text size="sm" truncate>{option.name}</Text>
+                  <Text size="sm" style={{ lineHeight: 1, overflowWrap: 'anywhere' }}>{option.name}</Text>
                   {option.provider && <Text size="xs" c="dimmed" truncate>{option.provider}</Text>}
                   {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" sourceOption audioInteractive onAudioOpenedChange={setAudioOpened} />}
                 </Stack>
