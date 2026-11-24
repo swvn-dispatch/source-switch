@@ -91,14 +91,15 @@ for section_id, label, fields in (
             "default": ["live", "vod", "catchup"], "section": section_id,
             "options": [{"value": "live", "label": "Live"}, {"value": "vod", "label": "VOD"},
                         {"value": "catchup", "label": "Catch-up"}],
-            "description": "Choose which session types appear on the dashboard. Changes apply within a few seconds after saving.",
+            "description": "Choose which session types appear on the dashboard.",
         })
     for field_id, field_label, default in fields:
         PLUGIN_FIELDS.append({
             "id": field_id, "label": field_label, "type": "boolean",
             "default": default, "section": section_id,
-            "description": "Changes appear on the dashboard within a few seconds after saving."
-            + (" This obscures labels in the dashboard, not data returned by APIs or text embedded in stream names." if field_id == "censor_provider" else "")
-            + (" This blocks the Source Switch API action, not Dispatcharr's own API." if field_id.startswith("allow_") else "")
-            + (" VOD and catch-up stop and disconnect are the same action, so both must be allowed for either control to be available." if field_id in {"allow_stop", "allow_disconnect"} else ""),
+            "description": (
+                ("This obscures labels in the dashboard, not data returned by APIs or text embedded in stream names." if field_id == "censor_provider" else "")
+                + ("This blocks the Source Switch API action, not Dispatcharr's own API." if field_id.startswith("allow_") else "")
+                + (" VOD and catch-up stop and disconnect are the same action, so both must be allowed for either control to be available." if field_id in {"allow_stop", "allow_disconnect"} else "")
+            ),
         })
