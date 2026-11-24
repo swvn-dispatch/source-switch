@@ -70,6 +70,12 @@ export function mockApi() {
             }],
           });
         }
+        if (path === `/api/sessions/${liveChannelId}`) {
+          return json(response, { clients: [
+            { client_id: 'live-1', ip_address: '192.168.1.20', username: 'alex', user_agent: 'AppleCoreMedia/1.0', output_format: 'fmp4', output_profile_name: 'Apple TV 1080p' },
+            { client_id: 'live-2', ip_address: '192.168.1.21', username: 'sam', user_agent: 'VLC/3.0', output_format: 'mpegts' },
+          ] });
+        }
         if (path === '/api/media-connections') {
           return json(response, {
             vod_connections: [

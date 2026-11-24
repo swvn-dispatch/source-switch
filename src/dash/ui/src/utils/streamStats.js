@@ -21,6 +21,11 @@ export function audioSummary(track) {
     .filter(Boolean).join(' ');
 }
 
+export function compactResolution(value) {
+  const resolutions = { '640x480': '480p', '720x480': '480p', '720x576': '576p', '1280x720': '720p', '1920x1080': '1080p', '3840x2160': '4K', '7680x4320': '8K' };
+  return resolutions[String(value).toLowerCase()] || value;
+}
+
 export function audioFields(track) {
   const fields = [];
   if (track.audio_language) fields.push(['Language', String(track.audio_language).toUpperCase()]);

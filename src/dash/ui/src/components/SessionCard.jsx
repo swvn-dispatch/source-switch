@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Card, Group, Text, Badge, Combobox, Input, InputBase, ScrollArea, useCombobox, Accordion, Stack, ActionIcon, Tooltip, Loader, Center, Image, ThemeIcon } from '@mantine/core';
-import { IconUserOff, IconSquareX, IconVideo, IconCloudUpload, IconCheck, IconLoader2, IconPlayerPlay } from '@tabler/icons-react';
+import { Card, Group, Text, Badge, Button, ScrollArea, Modal, Stack, ActionIcon, Tooltip, Loader, Center, Image, ThemeIcon } from '@mantine/core';
+import { IconUser, IconUserOff, IconSquareX, IconVideo, IconCloudUpload, IconCheck, IconLoader2, IconPlayerPlay, IconList, IconArrowsRightLeft } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { ConfirmModal, resolveStatusColor } from '@swvn-dispatch/dispatch-ui-kit';
 import { channelStreams, switchSource, disconnectClient, stopChannel, sessionDetail, channelLogoUrl } from '../api.js';
 import ProgramTimeline from './ProgramTimeline.jsx';
 import AudioStats from './AudioStats.jsx';
-import { audioSummary, audioTracks, duration, finiteNumber } from '../utils/streamStats.js';
+import fallbackLogo from '/logo.png';
+import { audioSummary, audioTracks, compactResolution, duration, finiteNumber } from '../utils/streamStats.js';
 
 function formatUptime(seconds) {
   if (seconds == null) return '-';
@@ -31,59 +32,37 @@ const STATE_COLORS = {
 // Matches Dispatcharr's own Stats page badge colors (StreamConnectionCard.jsx)
 const SPEED_OK_THRESHOLD = 1.0;
 
-function SourceSelect({ options, value, onChange, disabled, loading }) {
-  const combobox = useCombobox({
-    onDropdownClose: () => combobox.resetSelectedOption(),
-    onDropdownOpen: () => combobox.updateSelectedOptionIndex('active'),
-  });
-  const selected = options.find((option) => option.value === value);
-
+function SourceSelect({ options, value, onChange, disabled, opened, onClose }) {
+  const [audioOpened, setAudioOpened] = useState(false);
   return (
-    <Combobox store={combobox} onOptionSubmit={(option) => { onChange(option); combobox.closeDropdown(); }}>
-      <Combobox.Target>
-        <InputBase
-          component="button"
-          type="button"
-          label="Source"
-          disabled={disabled}
-          rightSection={<Combobox.Chevron />}
-          rightSectionPointerEvents="none"
-          onClick={() => combobox.toggleDropdown()}
-          mb="sm"
-          styles={{ input: { textAlign: 'left', userSelect: 'none', WebkitUserSelect: 'none' } }}
-        >
-          {selected ? selected.label : <Input.Placeholder>{loading ? 'Loading…' : 'Select a source'}</Input.Placeholder>}
-        </InputBase>
-      </Combobox.Target>
-      <Combobox.Dropdown>
-        <Combobox.Options>
-          <ScrollArea.Autosize mah={320} type="scroll">
-            {options.map((option) => (
-              <Combobox.Option value={option.value} key={option.value} active={option.value === value}>
-                <Stack gap={2} py={2} style={{ width: '100%' }}>
-                  <Group justify="space-between" wrap="nowrap" gap="xs">
-                    <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }}>{option.name}</Text>
-                    {option.value === value && <IconCheck size={14} style={{ flexShrink: 0 }} />}
-                  </Group>
+    <Modal opened={opened} onClose={onClose} title="Sources" trapFocus={!audioOpened} closeOnEscape={!audioOpened} closeOnClickOutside={!audioOpened}>
+      <ScrollArea.Autosize mah={320} type="scroll">
+        {options.length ? options.map((option) => (
+              <Group key={option.value} wrap="nowrap" gap="sm" py="xs" justify="space-between">
+                <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                  <Text size="sm" truncate>{option.name}</Text>
                   {option.provider && <Text size="xs" c="dimmed" truncate>{option.provider}</Text>}
-                  {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" sourceOption />}
+                  {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" sourceOption audioInteractive onAudioOpenedChange={setAudioOpened} />}
                 </Stack>
-              </Combobox.Option>
-            ))}
-          </ScrollArea.Autosize>
-        </Combobox.Options>
-      </Combobox.Dropdown>
-    </Combobox>
+                <ActionIcon size="lg" variant="light" color="teal" disabled={disabled || option.value === value} aria-label={option.value === value ? 'Current source' : `Switch to ${option.name}`} onClick={() => { onChange(option.value); onClose(); }}>
+                  {option.value === value ? <IconCheck size={16} /> : <IconArrowsRightLeft size={16} />}
+                </ActionIcon>
+              </Group>
+        )) : <Text size="sm" c="dimmed">No sources available</Text>}
+      </ScrollArea.Autosize>
+    </Modal>
   );
 }
 
 export function StreamStatsBadges({
   stats,
   speed,
-  size = 'sm',
+  size = 'xs',
   justify = 'center',
   style,
   sourceOption = false,
+  audioInteractive = !sourceOption,
+  onAudioOpenedChange,
   ...groupProps
 }) {
   if (!stats) return null;
@@ -98,113 +77,81 @@ export function StreamStatsBadges({
     hasAudio ||
     stats.stream_type ||
     speed != null || cushion != null || prebuffer != null;
-  const badgeCount = [
-    stats.resolution,
-    stats.source_fps,
-    stats.video_codec,
-    hasAudio,
-    stats.stream_type,
-    speed != null,
-    cushion != null,
-    prebuffer != null,
-  ].filter(Boolean).length;
-
   return (
     <Group
-      gap="xs"
+      gap={4}
       justify={justify}
       {...groupProps}
       style={{
         display: hasAny ? undefined : 'none',
         flexWrap: 'wrap',
-        maxWidth: badgeCount > 3 ? 280 : undefined,
         justifyContent: justify,
         marginInline: justify === 'center' ? 'auto' : undefined,
         ...style,
       }}
     >
       {stats.resolution && (
-        <Tooltip label="Video resolution">
-          <Badge size={size} variant="light" color="red">
-            {stats.resolution}
-          </Badge>
+        <Tooltip label={`Video resolution: ${stats.resolution}`}>
+          <Badge size={size} variant="light" color="red">{compactResolution(stats.resolution)}</Badge>
         </Tooltip>
       )}
       {stats.source_fps && (
         <Tooltip label="Source frames per second">
-          <Badge size={size} variant="light" color="orange">
-            {Math.round(stats.source_fps)} FPS
-          </Badge>
+          <Badge size={size} variant="light" color="orange">{Math.round(stats.source_fps)} FPS</Badge>
         </Tooltip>
       )}
       {stats.video_codec && (
         <Tooltip label="Video codec">
-          <Badge size={size} variant="light" color="blue">
-            {stats.video_codec.toUpperCase()}
-          </Badge>
+          <Badge size={size} variant="light" color="blue">{stats.video_codec.toUpperCase()}</Badge>
         </Tooltip>
       )}
-      <AudioStats stats={stats} size={size} interactive={!sourceOption} />
+      <AudioStats stats={stats} size={size} interactive={audioInteractive} onOpenedChange={onAudioOpenedChange} />
       {stats.stream_type && (
         <Tooltip label="Stream type">
-          <Badge size={size} variant="light" color="cyan">
-            {stats.stream_type.toUpperCase()}
-          </Badge>
+          <Badge size={size} variant="light" color="cyan">{stats.stream_type.toUpperCase()}</Badge>
         </Tooltip>
       )}
       {speed != null && (
         <Tooltip label={`Current speed: ${speed.toFixed(2)}x`}>
-          <Badge size={size} variant="light" color={speed >= SPEED_OK_THRESHOLD ? 'green' : 'red'}>
-            {speed.toFixed(2)}x
-          </Badge>
+          <Badge size={size} variant="light" color={speed >= SPEED_OK_THRESHOLD ? 'green' : 'red'}>{speed.toFixed(2)}x</Badge>
         </Tooltip>
       )}
       {cushion != null && (
         <Tooltip label="Remaining ingest buffer cushion">
-          <Badge size={size} variant="light" color="gray">Cushion {cushion.toFixed(1)}s</Badge>
+          <Badge size={size} variant="light" color="gray">{cushion.toFixed(1)}s</Badge>
         </Tooltip>
       )}
       {prebuffer != null && (
         <Tooltip label="Measured join prebuffer">
-          <Badge size={size} variant="light" color="gray">Join prebuffer {prebuffer.toFixed(1)}s</Badge>
+          <Badge size={size} variant="light" color="gray">{prebuffer.toFixed(1)}s</Badge>
         </Tooltip>
       )}
     </Group>
   );
 }
 
-export function SessionStatsBlock({ session, speed, hideClientCount = false }) {
+export function SessionStatsBlock({ session, speed, currentSource }) {
+  const metrics = [
+    { label: 'Uptime', value: formatUptime(session.uptime) },
+    { label: 'Bitrate', value: session.avg_bitrate || '-' },
+    ...(session.data_sent ? [{ label: 'Data Sent', value: session.data_sent }] : []),
+  ];
   return (
     <>
       <Stack gap={4} mb="sm">
-        <Group gap="xs" justify="space-between">
-          <Text size="sm" c="dimmed">
-            Uptime
-          </Text>
-          <Text size="sm">{formatUptime(session.uptime)}</Text>
+        <Group gap="xs" grow align="flex-start" mb="xs">
+          {metrics.map(({ label, value }, index) => (
+            <div key={label} style={{ textAlign: index === 0 ? 'left' : index === metrics.length - 1 ? 'right' : 'center' }}>
+              <Text size="xs" c="dimmed">{label}</Text><Text size="sm">{value}</Text>
+            </div>
+          ))}
         </Group>
-        <Group gap="xs" justify="space-between">
-          <Text size="sm" c="dimmed">
-            Bitrate
-          </Text>
-          <Text size="sm">{session.avg_bitrate || '-'}</Text>
+        <Group gap="xs" justify="space-between" wrap="nowrap">
+          <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+            <IconList size={14} /><Text size="sm" c="dimmed">Source</Text>
+          </Group>
+          <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }} ta="right">{currentSource}</Text>
         </Group>
-        {!hideClientCount && (
-          <Group gap="xs" justify="space-between">
-            <Text size="sm" c="dimmed">
-              Clients
-            </Text>
-            <Text size="sm">{session.client_count ?? 0}</Text>
-          </Group>
-        )}
-        {session.data_sent && (
-          <Group gap="xs" justify="space-between">
-            <Text size="sm" c="dimmed">
-              Data Sent
-            </Text>
-            <Text size="sm">{session.data_sent}</Text>
-          </Group>
-        )}
         {session.stream_profile_name && (
           <Group gap="xs" justify="space-between" wrap="nowrap">
             <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
@@ -250,7 +197,6 @@ export default function SessionCard({
   onDisconnect,
   stopSuccessMessage = 'Stream stopped',
   disconnectSuccessMessage = 'Client disconnected',
-  hideClientCount = false,
   logoUrl,
   statusIcon: StatusIcon,
   statusLabel,
@@ -264,8 +210,14 @@ export default function SessionCard({
   const [switching, setSwitching] = useState(false);
   const [clients, setClients] = useState(session.clients || []);
   const [clientsLoading, setClientsLoading] = useState(false);
-  const [expanded, setExpanded] = useState(null);
+  const [clientsOpened, setClientsOpened] = useState(false);
+  const [sourcesOpened, setSourcesOpened] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   const [confirm, setConfirm] = useState(null);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoUrl, session.channel_id]);
 
   useEffect(() => {
     if (sourceDisabled) return undefined;
@@ -302,7 +254,10 @@ export default function SessionCard({
   }
 
   async function loadClients() {
-    if (sourceDisabled) return;
+    if (sourceDisabled) {
+      setClients(session.clients || []);
+      return;
+    }
     setClientsLoading(true);
     try {
       const detail = await sessionDetail(session.channel_id);
@@ -354,21 +309,28 @@ export default function SessionCard({
     provider: s.provider,
     stats: s.stats,
   }));
+  const currentSource = streamOptions.find((option) => option.value === currentStreamId)?.name || (streams === null ? 'Loading…' : 'Unknown');
 
   return (
     <Card withBorder radius="md" padding="md">
       <Group justify="space-between" mb="xs" wrap="nowrap">
         <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
           <Image
-            src={logoUrl || channelLogoUrl(session.channel_id)}
+            src={logoFailed ? fallbackLogo : logoUrl || channelLogoUrl(session.channel_id)}
             alt=""
             h={28}
             w={28}
             fit="contain"
             radius="sm"
-            style={{ flexShrink: 0 }}
+            style={{
+              flexShrink: 0,
+              filter: logoFailed ? 'grayscale(1)' : undefined,
+              opacity: logoFailed ? 0.75 : undefined,
+              padding: logoFailed ? 3 : undefined,
+            }}
             onError={(e) => {
-              e.currentTarget.style.visibility = 'hidden';
+              if (logoFailed) e.currentTarget.style.visibility = 'hidden';
+              else setLogoFailed(true);
             }}
           />
           <Text fw={600} truncate>
@@ -406,30 +368,21 @@ export default function SessionCard({
         </Group>
       </Group>
 
-      <SourceSelect
-        options={streamOptions}
-        value={currentStreamId}
-        onChange={handleSwitch}
-        disabled={sourceDisabled || switching || streams === null}
-        loading={streams === null}
-      />
-
       <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
         <ProgramTimeline programme={programme} session={session} mode={timelineMode} />
       </div>
-      <SessionStatsBlock session={session} speed={speed} hideClientCount={hideClientCount} />
+      <SessionStatsBlock session={session} speed={speed} currentSource={currentSource} />
 
-      <Accordion
-        value={expanded}
-        onChange={(value) => {
-          setExpanded(value);
-          if (value) loadClients();
-        }}
-        styles={{ item: { borderBottom: 'none' } }}
-      >
-        <Accordion.Item value="clients">
-          <Accordion.Control>Connected clients ({session.client_count ?? clients.length})</Accordion.Control>
-          <Accordion.Panel>
+      <Group justify="center">
+        <Button variant="light" size="xs" leftSection={<IconUser size={14} />} onClick={() => { setClientsOpened(true); loadClients(); }}>
+          {session.client_count ?? clients.length} {(session.client_count ?? clients.length) === 1 ? 'client' : 'clients'}
+        </Button>
+        <Button variant="light" color="teal" size="xs" leftSection={<IconList size={14} />} disabled={streams === null || streamOptions.length <= 1} onClick={() => setSourcesOpened(true)}>
+          {streamOptions.length} {streamOptions.length === 1 ? 'source' : 'sources'}
+        </Button>
+      </Group>
+      <SourceSelect options={streamOptions} value={currentStreamId} onChange={handleSwitch} disabled={sourceDisabled || switching} opened={sourcesOpened} onClose={() => setSourcesOpened(false)} />
+      <Modal opened={clientsOpened} onClose={() => setClientsOpened(false)} title="Connected clients">
             {clientsLoading ? (
               <Center py="sm">
                 <Loader size="sm" />
@@ -454,20 +407,8 @@ export default function SessionCard({
                       <Text size="xs" c="dimmed" truncate>
                         {c.user_agent || 'unknown'}
                       </Text>
-                      {(c.output_format || c.output_profile_name) && (
-                        <Group gap="xs" mt={2} wrap="nowrap">
-                          {c.output_format && (
-                            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-                              Container: {c.output_format}
-                            </Text>
-                          )}
-                          {c.output_profile_name && (
-                            <Text size="xs" c="dimmed" truncate style={{ minWidth: 0 }}>
-                              Output Profile: {c.output_profile_name}
-                            </Text>
-                          )}
-                        </Group>
-                      )}
+                      {c.output_format && <Text size="xs" c="dimmed" mt={2}>Container: {c.output_format}</Text>}
+                      {c.output_profile_name && <Text size="xs" c="dimmed" truncate>Output Profile: {c.output_profile_name}</Text>}
                     </div>
                     <Tooltip label="Disconnect">
                       <ActionIcon
@@ -490,9 +431,7 @@ export default function SessionCard({
                 ))}
               </Stack>
             )}
-          </Accordion.Panel>
-        </Accordion.Item>
-      </Accordion>
+      </Modal>
 
       <ConfirmModal action={confirm} onClose={() => setConfirm(null)} />
     </Card>

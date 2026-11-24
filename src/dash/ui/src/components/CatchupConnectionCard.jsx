@@ -35,7 +35,6 @@ export default function CatchupConnectionCard({ session, connection, programme, 
       statusIcon={IconHistory}
       statusLabel="Catch-up"
       statusColor="cyan"
-      hideClientCount
       onStop={stop}
       onDisconnect={stop}
       stopLabel="Stop Catch-up"
