@@ -5,6 +5,10 @@ export function finiteNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+export function censorProvider(value) {
+  return value ? `${Array.from(String(value))[0]}*****` : value;
+}
+
 export function duration(value) {
   const number = finiteNumber(value);
   return number != null && number >= 0 ? number : null;

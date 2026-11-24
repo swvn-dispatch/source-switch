@@ -1,8 +1,9 @@
 import { IconHistory } from '@tabler/icons-react';
 import { stopCatchupSession } from '../api.js';
 import SessionCard from './SessionCard.jsx';
+import { censorProvider } from '../utils/streamStats.js';
 
-export default function CatchupConnectionCard({ session, connection, programme, onChanged }) {
+export default function CatchupConnectionCard({ session, connection, programme, onChanged, preferences }) {
   const profile = connection.m3u_profile || {};
   const source = session.source || null;
   const catchupSession = {
@@ -18,7 +19,7 @@ export default function CatchupConnectionCard({ session, connection, programme, 
       client_id: connection.client_id || connection.session_id,
       ip_address: connection.ip_address || 'Unknown IP',
     }],
-    m3u_profile_name: profile.profile_name || profile.account_name,
+    m3u_profile_name: profile.profile_name || (preferences?.censor_provider ? censorProvider(profile.account_name) : profile.account_name),
     avg_bitrate: connection.avg_bitrate_kbps
       ? `${connection.avg_bitrate_kbps >= 1000 ? (connection.avg_bitrate_kbps / 1000).toFixed(2) : connection.avg_bitrate_kbps.toFixed(0)} ${connection.avg_bitrate_kbps >= 1000 ? 'Mbps' : 'Kbps'}`
       : '-',
@@ -28,6 +29,7 @@ export default function CatchupConnectionCard({ session, connection, programme, 
   return (
     <SessionCard
       session={catchupSession}
+      preferences={preferences}
       programme={programme}
       timelineMode="catchup"
       sourceDisabled

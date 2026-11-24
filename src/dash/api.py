@@ -140,7 +140,25 @@ def handle_auth_refresh(environ, start_response):
         return _json_error(start_response, "401 Unauthorized", "Refresh token invalid or expired")
 
 
-def handle_sessions_list(environ, start_response):
+DASHBOARD_DEFAULTS = {
+    "show_program": True, "show_metrics": True, "show_source": True,
+    "show_stream_profile": True, "show_m3u_profile": True, "show_stats": True,
+    "censor_provider": False, "allow_disconnect": True, "allow_stop": True, "allow_switch": True,
+    "session_types": ["live", "vod", "catchup"],
+}
+
+
+def dashboard_preferences(settings):
+    """Expose only dashboard preferences, preserving defaults on older installs."""
+    preferences = {key: settings.get(key) if isinstance(settings.get(key), bool) else default
+                   for key, default in DASHBOARD_DEFAULTS.items() if key != "session_types"}
+    session_types = settings.get("session_types")
+    preferences["session_types"] = ([value for value in session_types if value in DASHBOARD_DEFAULTS["session_types"]]
+                                    if isinstance(session_types, list) else DASHBOARD_DEFAULTS["session_types"][:])
+    return preferences
+
+
+def handle_sessions_list(environ, start_response, settings=None):
     if environ.get("REQUEST_METHOD") == "OPTIONS":
         return cors_preflight(start_response)
     if not _verify_token(environ):
@@ -150,7 +168,8 @@ def handle_sessions_list(environ, start_response):
 
     try:
         sessions = _sessions().list_sessions()
-        return _json_ok(start_response, {"sessions": sessions, "count": len(sessions)})
+        return _json_ok(start_response, {"sessions": sessions, "count": len(sessions),
+                                         "preferences": dashboard_preferences(settings or {})})
     except Exception as e:
         logger.error(f"Sessions list failed: {e}", exc_info=True)
         return _json_error(start_response, "500 Internal Server Error", str(e))
@@ -206,13 +225,15 @@ def handle_channel_streams(environ, start_response, channel_uuid):
         return _json_error(start_response, "500 Internal Server Error", str(e))
 
 
-def handle_channel_switch(environ, start_response, channel_uuid):
+def handle_channel_switch(environ, start_response, channel_uuid, settings=None):
     if environ.get("REQUEST_METHOD") == "OPTIONS":
         return cors_preflight(start_response)
     if not _verify_token(environ):
         return _json_error(start_response, "401 Unauthorized", "Authentication required")
     if environ.get("REQUEST_METHOD") != "POST":
         return _json_error(start_response, "405 Method Not Allowed", "POST only")
+    if not dashboard_preferences(settings or {})["allow_switch"]:
+        return _json_error(start_response, "403 Forbidden", "Source switching is disabled")
 
     try:
         data = json.loads(_read_body(environ) or b"{}")
@@ -233,13 +254,15 @@ def handle_channel_switch(environ, start_response, channel_uuid):
         return _json_error(start_response, "500 Internal Server Error", str(e))
 
 
-def handle_client_disconnect(environ, start_response, channel_uuid, client_id):
+def handle_client_disconnect(environ, start_response, channel_uuid, client_id, settings=None):
     if environ.get("REQUEST_METHOD") == "OPTIONS":
         return cors_preflight(start_response)
     if not _verify_token(environ):
         return _json_error(start_response, "401 Unauthorized", "Authentication required")
     if environ.get("REQUEST_METHOD") != "POST":
         return _json_error(start_response, "405 Method Not Allowed", "POST only")
+    if not dashboard_preferences(settings or {})["allow_disconnect"]:
+        return _json_error(start_response, "403 Forbidden", "Client disconnection is disabled")
 
     try:
         result = _sessions().disconnect_client(channel_uuid, client_id)
@@ -251,13 +274,15 @@ def handle_client_disconnect(environ, start_response, channel_uuid, client_id):
         return _json_error(start_response, "500 Internal Server Error", str(e))
 
 
-def handle_channel_stop(environ, start_response, channel_uuid):
+def handle_channel_stop(environ, start_response, channel_uuid, settings=None):
     if environ.get("REQUEST_METHOD") == "OPTIONS":
         return cors_preflight(start_response)
     if not _verify_token(environ):
         return _json_error(start_response, "401 Unauthorized", "Authentication required")
     if environ.get("REQUEST_METHOD") != "POST":
         return _json_error(start_response, "405 Method Not Allowed", "POST only")
+    if not dashboard_preferences(settings or {})["allow_stop"]:
+        return _json_error(start_response, "403 Forbidden", "Stopping streams is disabled")
 
     try:
         result = _sessions().stop_channel(channel_uuid)
@@ -269,13 +294,16 @@ def handle_channel_stop(environ, start_response, channel_uuid):
         return _json_error(start_response, "500 Internal Server Error", str(e))
 
 
-def _handle_media_stop(environ, start_response, stop):
+def _handle_media_stop(environ, start_response, stop, settings):
     if environ.get("REQUEST_METHOD") == "OPTIONS":
         return cors_preflight(start_response)
     if not _verify_token(environ):
         return _json_error(start_response, "401 Unauthorized", "Authentication required")
     if environ.get("REQUEST_METHOD") != "POST":
         return _json_error(start_response, "405 Method Not Allowed", "POST only")
+    preferences = dashboard_preferences(settings or {})
+    if not preferences["allow_stop"] or not preferences["allow_disconnect"]:
+        return _json_error(start_response, "403 Forbidden", "Stopping media connections is disabled")
     try:
         result = stop()
         if result.get("status") == "error":
@@ -286,15 +314,15 @@ def _handle_media_stop(environ, start_response, stop):
         return _json_error(start_response, "500 Internal Server Error", str(e))
 
 
-def handle_vod_stop(environ, start_response, client_id):
+def handle_vod_stop(environ, start_response, client_id, settings=None):
     return _handle_media_stop(
-        environ, start_response, lambda: _sessions().stop_vod_client(client_id)
+        environ, start_response, lambda: _sessions().stop_vod_client(client_id), settings
     )
 
 
-def handle_catchup_stop(environ, start_response, session_id):
+def handle_catchup_stop(environ, start_response, session_id, settings=None):
     return _handle_media_stop(
-        environ, start_response, lambda: _sessions().stop_catchup_session(session_id)
+        environ, start_response, lambda: _sessions().stop_catchup_session(session_id), settings
     )
 
 

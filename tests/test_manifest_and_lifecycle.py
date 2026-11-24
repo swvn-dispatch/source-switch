@@ -57,7 +57,45 @@ class ManifestTests(unittest.TestCase):
             "type": "section",
             "collapsed": False,
         })
-        self.assertTrue(all(field["section"] == "dashboard_settings" for field in fields[1:]))
+        self.assertTrue(all(field["section"] == "dashboard_settings" for field in fields[1:4]))
+        sections = {field["id"]: field for field in fields if field["type"] == "section"}
+        self.assertFalse(sections["card_customization"]["collapsed"])
+        self.assertNotIn("behavior", sections)
+
+    def test_dashboard_preference_defaults_match_schema(self):
+        plugin = load_plugin_module().Plugin()
+        preference_ids = {"censor_provider", "allow_disconnect", "allow_stop", "allow_switch"}
+        fields = {field["id"]: field for field in plugin.fields if field.get("section") == "card_customization" or field["id"] in preference_ids}
+        spec = importlib.util.spec_from_file_location("dashboard_api_test", SRC / "dash" / "api.py")
+        api = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(api)
+        self.assertEqual(api.dashboard_preferences({}), {key: field["default"] for key, field in fields.items()})
+        self.assertFalse(api.dashboard_preferences({"show_stats": False})["show_stats"])
+        self.assertTrue(api.dashboard_preferences({"show_stats": "false"})["show_stats"])
+        self.assertNotIn("dash_port", api.dashboard_preferences({"dash_port": 9294}))
+        self.assertEqual(api.dashboard_preferences({"session_types": []})["session_types"], [])
+        self.assertEqual(api.dashboard_preferences({"session_types": ["vod", "invalid"]})["session_types"], ["vod"])
+
+    def test_disabled_actions_are_rejected_before_calling_proxy(self):
+        spec = importlib.util.spec_from_file_location("dashboard_action_api_test", SRC / "dash" / "api.py")
+        api = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(api)
+        cases = [
+            (api.handle_channel_switch, ("channel",), {"allow_switch": False}),
+            (api.handle_channel_stop, ("channel",), {"allow_stop": False}),
+            (api.handle_client_disconnect, ("channel", "client"), {"allow_disconnect": False}),
+            (api.handle_vod_stop, ("client",), {"allow_stop": False}),
+            (api.handle_vod_stop, ("client",), {"allow_disconnect": False}),
+            (api.handle_catchup_stop, ("session",), {"allow_stop": False}),
+            (api.handle_catchup_stop, ("session",), {"allow_disconnect": False}),
+        ]
+        with mock.patch.object(api, "_verify_token", return_value=True), mock.patch.object(api, "_sessions") as sessions:
+            for handler, args, settings in cases:
+                with self.subTest(handler=handler.__name__, settings=settings):
+                    start = mock.Mock()
+                    handler({"REQUEST_METHOD": "POST"}, start, *args, settings)
+                    self.assertEqual(start.call_args.args[0], "403 Forbidden")
+            sessions.assert_not_called()
 
 
 class LifecycleTests(unittest.TestCase):

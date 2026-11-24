@@ -64,6 +64,19 @@ def _settings() -> dict:
         return {}
 
 
+def _action_settings() -> dict:
+    """Fail closed for mutations if the saved policy cannot be read."""
+    try:
+        from apps.plugins.models import PluginConfig
+        settings = PluginConfig.objects.get(key="source_switch").settings
+        if not isinstance(settings, dict):
+            raise ValueError("Invalid plugin settings")
+        return settings
+    except Exception:
+        logger.warning("Source Switch: unable to read action settings; denying actions", exc_info=True)
+        return {"allow_switch": False, "allow_stop": False, "allow_disconnect": False}
+
+
 def _normalized_dash_path() -> str:
     """Return the configured mount path, normalized to e.g. '/switch' (no trailing slash), or '' for root."""
     raw = (_settings().get("dash_path") or "/switch").strip()
@@ -138,7 +151,7 @@ class SourceSwitchServer:
         if sub_path == "/api/auth/refresh":
             return api.handle_auth_refresh(environ, start_response)
         if sub_path == "/api/sessions":
-            return api.handle_sessions_list(environ, start_response)
+            return api.handle_sessions_list(environ, start_response, _settings())
         if sub_path == "/api/media-connections":
             return api.handle_media_connections(environ, start_response)
         if sub_path == "/api/catchup/programmes":
@@ -157,11 +170,11 @@ class SourceSwitchServer:
 
         m = re.match(r"^/api/channels/([^/]+)/switch$", sub_path)
         if m:
-            return api.handle_channel_switch(environ, start_response, m.group(1))
+            return api.handle_channel_switch(environ, start_response, m.group(1), _action_settings())
 
         m = re.match(r"^/api/channels/([^/]+)/stop$", sub_path)
         if m:
-            return api.handle_channel_stop(environ, start_response, m.group(1))
+            return api.handle_channel_stop(environ, start_response, m.group(1), _action_settings())
 
         m = re.match(r"^/api/channels/([^/]+)/logo$", sub_path)
         if m:
@@ -173,15 +186,15 @@ class SourceSwitchServer:
 
         m = re.match(r"^/api/vod/clients/([^/]+)/stop$", sub_path)
         if m:
-            return api.handle_vod_stop(environ, start_response, m.group(1))
+            return api.handle_vod_stop(environ, start_response, m.group(1), _action_settings())
 
         m = re.match(r"^/api/catchup/sessions/([^/]+)/stop$", sub_path)
         if m:
-            return api.handle_catchup_stop(environ, start_response, m.group(1))
+            return api.handle_catchup_stop(environ, start_response, m.group(1), _action_settings())
 
         m = re.match(r"^/api/channels/([^/]+)/clients/([^/]+)/disconnect$", sub_path)
         if m:
-            return api.handle_client_disconnect(environ, start_response, m.group(1), m.group(2))
+            return api.handle_client_disconnect(environ, start_response, m.group(1), m.group(2), _action_settings())
 
         start_response("404 Not Found", [("Content-Type", "text/plain")])
         return [b"Not Found\n"]

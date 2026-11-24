@@ -164,8 +164,9 @@ export function mockApi() {
         if (/^\/api\/channels\/[^/]+\/streams$/.test(path)) {
           return json(response, {
             streams: [
-              { id: 101, name: 'Primary Source', provider: 'Primary Provider', stats: { audio_streams: audioStreams, audio_codec: 'ac3', audio_channels: '5.1', join_prebuffer_seconds: 4.25 } },
-              { id: 102, name: 'Fallback Source', provider: 'Backup Provider', stats: { audio_codec: 'aac', audio_channels: 'stereo' } },
+              { id: 101, name: 'A Very Long Primary Source Name for Testing Truncation and Closing Parentheses', provider: 'Primary Provider', stats: { audio_streams: audioStreams, audio_codec: 'ac3', audio_channels: '5.1', join_prebuffer_seconds: 4.25 } },
+              { id: 102, name: 'Another Exceptionally Long Fallback Source Name with Additional Details', provider: 'Backup Provider with an Especially Long Name', stats: { audio_codec: 'aac', audio_channels: 'stereo' } },
+              { id: 104, name: 'Source without a provider and with a long descriptive title', stats: { audio_codec: 'mp3' } },
             ],
             current_stream_id: 101,
           });

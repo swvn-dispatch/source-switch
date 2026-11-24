@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { audioFields, audioSummary, audioTracks, compactResolution, duration, finiteNumber } from './streamStats.js';
+import { audioFields, audioSummary, audioTracks, censorProvider, compactResolution, duration, finiteNumber } from './streamStats.js';
 
 test('uses the first detected track rather than the best summary', () => {
   const stats = { audio_codec: 'ac3', audio_streams: [null, { audio_language: 'eng', audio_codec: 'aac', audio_channels: 'stereo' }, { audio_codec: 'ac3' }] };
@@ -30,4 +30,11 @@ test('shortens common resolutions and preserves unknown ones', () => {
   assert.equal(compactResolution('1920x1080'), '1080p');
   assert.equal(compactResolution('3840x2160'), '4K');
   assert.equal(compactResolution('1440x1080'), '1440x1080');
+});
+
+test('censors provider names to one character and five asterisks', () => {
+  assert.equal(censorProvider('A provider'), 'A*****');
+  assert.equal(censorProvider('😀 Provider'), '😀*****');
+  assert.equal(censorProvider(''), '');
+  assert.equal(censorProvider(null), null);
 });

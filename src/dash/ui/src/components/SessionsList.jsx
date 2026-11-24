@@ -14,6 +14,7 @@ const POLL_MS = 5000;
 
 export default function SessionsList({ onLoggedOut }) {
   const [sessions, setSessions] = useState(null);
+  const [preferences, setPreferences] = useState({});
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [vod, setVod] = useState([]);
@@ -32,6 +33,7 @@ export default function SessionsList({ onLoggedOut }) {
         (a, b) => (a.started_at ?? Infinity) - (b.started_at ?? Infinity),
       );
       setSessions(sorted);
+      setPreferences(liveResult.value.preferences || {});
       const liveData = await liveProgrammes(sorted.map((session) => session.channel_id));
       setLiveProgrammeByChannel(Object.fromEntries(
         (liveData.programmes || []).map((programme) => [programme.channel_uuid, programme]),
@@ -76,21 +78,30 @@ export default function SessionsList({ onLoggedOut }) {
     setRefreshing(false);
   }
 
+  const visibleTypes = Array.isArray(preferences.session_types) ? preferences.session_types : ['live', 'vod', 'catchup'];
+  const visibleLive = visibleTypes.includes('live') ? sessions || [] : [];
+  const visibleVod = visibleTypes.includes('vod') ? vod : [];
+  const visibleCatchup = visibleTypes.includes('catchup') ? catchup : [];
+  const counts = [
+    ...(visibleTypes.includes('live') ? [`${visibleLive.length} live`] : []),
+    ...(visibleTypes.includes('vod') ? [`${visibleVod.reduce((count, item) => count + (item.connections?.length || 0), 0)} vod`] : []),
+    ...(visibleTypes.includes('catchup') ? [`${visibleCatchup.reduce((count, item) => count + (item.connections?.length || 0), 0)} catch-up`] : []),
+  ];
   const cards = [
-    ...(sessions || []).map((session) => ({
+    ...visibleLive.map((session) => ({
       id: `live-${session.channel_id}`,
       startedAt: session.started_at || 0,
-      node: <SessionCard session={session} programme={liveProgrammeByChannel[session.channel_id]} onChanged={refresh} />,
+      node: <SessionCard session={session} programme={liveProgrammeByChannel[session.channel_id]} onChanged={refresh} preferences={preferences} />,
     })),
-    ...vod.flatMap((content) => (content.connections || []).map((connection) => ({
+    ...visibleVod.flatMap((content) => (content.connections || []).map((connection) => ({
       id: `vod-${connection.client_id}`,
       startedAt: Number(connection.connected_at) || 0,
-      node: <VodConnectionCard content={content} connection={connection} onChanged={refresh} />,
+      node: <VodConnectionCard content={content} connection={connection} onChanged={refresh} preferences={preferences} />,
     }))),
-    ...catchup.flatMap((session) => (session.connections || []).map((connection) => ({
+    ...visibleCatchup.flatMap((session) => (session.connections || []).map((connection) => ({
       id: `catchup-${connection.client_id}`,
       startedAt: Number(connection.connected_at) || 0,
-      node: <CatchupConnectionCard session={session} connection={connection} programme={programmes[session.session_id]} onChanged={refresh} />,
+      node: <CatchupConnectionCard session={session} connection={connection} programme={programmes[session.session_id]} onChanged={refresh} preferences={preferences} />,
     }))),
   ].sort((a, b) => a.startedAt - b.startedAt);
 
@@ -110,29 +121,23 @@ export default function SessionsList({ onLoggedOut }) {
 
       <AppShell.Main>
         <Stack p="md" maw={860} mx="auto">
-          <Text size="xs" tt="uppercase" fw={700} c="dimmed">
-            Active Connections
-          </Text>
-
           {error && (
             <Text c="red" size="sm">
               {error}
             </Text>
           )}
 
+          {sessions !== null && counts.length > 0 && <Text size="xs" c="dimmed">{counts.join(', ')}</Text>}
           {sessions === null ? (
             <Center py="xl">
               <Loader />
             </Center>
           ) : cards.length === 0 ? (
             <Text c="dimmed" ta="center" py="xl">
-              No active connections
+              {visibleTypes.length ? 'No active connections for the selected session types' : 'No session types selected'}
             </Text>
           ) : (
             <>
-              <Text size="xs" c="dimmed">
-                {sessions.length} live, {vod.reduce((count, item) => count + (item.connections?.length || 0), 0)} vod, {catchup.reduce((count, item) => count + (item.connections?.length || 0), 0)} catch-up
-              </Text>
               {isDesktop ? (
                 <SimpleGrid cols={2} spacing="md">
                   {[0, 1].map((column) => (

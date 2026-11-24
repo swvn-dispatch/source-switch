@@ -61,3 +61,44 @@ PLUGIN_FIELDS = [
         ),
     },
 ]
+
+# Display and behavior settings are read from the database on each dashboard
+# refresh. They control presentation only, not access to API actions.
+CARD_SETTINGS = [
+    ("show_program", "Show program data", True),
+    ("show_metrics", "Show metrics line", True),
+    ("show_source", "Show source", True),
+    ("show_stream_profile", "Show stream profile", True),
+    ("show_m3u_profile", "Show M3U profile", True),
+    ("show_stats", "Show stats", True),
+]
+BEHAVIOR_SETTINGS = [
+    ("censor_provider", "Censor provider name", False),
+    ("allow_disconnect", "Allow disconnecting clients", True),
+    ("allow_stop", "Allow killing streams", True),
+    ("allow_switch", "Allow swapping streams", True),
+]
+
+for section_id, label, fields in (
+    ("dashboard_settings", "Dashboard Settings", BEHAVIOR_SETTINGS),
+    ("card_customization", "Card Customization", CARD_SETTINGS),
+):
+    if section_id != "dashboard_settings":
+        PLUGIN_FIELDS.append({"id": section_id, "label": label, "type": "section", "collapsed": False})
+    if section_id == "card_customization":
+        PLUGIN_FIELDS.append({
+            "id": "session_types", "label": "Session types", "type": "multiselect",
+            "default": ["live", "vod", "catchup"], "section": section_id,
+            "options": [{"value": "live", "label": "Live"}, {"value": "vod", "label": "VOD"},
+                        {"value": "catchup", "label": "Catch-up"}],
+            "description": "Choose which session types appear on the dashboard. Changes apply within a few seconds after saving.",
+        })
+    for field_id, field_label, default in fields:
+        PLUGIN_FIELDS.append({
+            "id": field_id, "label": field_label, "type": "boolean",
+            "default": default, "section": section_id,
+            "description": "Changes appear on the dashboard within a few seconds after saving."
+            + (" This obscures labels in the dashboard, not data returned by APIs or text embedded in stream names." if field_id == "censor_provider" else "")
+            + (" This blocks the Source Switch API action, not Dispatcharr's own API." if field_id.startswith("allow_") else "")
+            + (" VOD and catch-up stop and disconnect are the same action, so both must be allowed for either control to be available." if field_id in {"allow_stop", "allow_disconnect"} else ""),
+        })
