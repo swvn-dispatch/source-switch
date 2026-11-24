@@ -377,7 +377,7 @@ export default function SessionCard({
         <Button variant="light" size="xs" leftSection={<IconUser size={14} />} onClick={() => { setClientsOpened(true); loadClients(); }}>
           {session.client_count ?? clients.length} {(session.client_count ?? clients.length) === 1 ? 'client' : 'clients'}
         </Button>
-        <Button variant="light" color="teal" size="xs" leftSection={<IconList size={14} />} disabled={streams === null || streamOptions.length <= 1} onClick={() => setSourcesOpened(true)}>
+        <Button variant="light" color="teal" size="xs" leftSection={<IconList size={14} />} disabled={streams === null} onClick={() => setSourcesOpened(true)}>
           {streamOptions.length} {streamOptions.length === 1 ? 'source' : 'sources'}
         </Button>
       </Group>
