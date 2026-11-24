@@ -5,6 +5,8 @@ import { notifications } from '@mantine/notifications';
 import { ConfirmModal, resolveStatusColor } from '@swvn-dispatch/dispatch-ui-kit';
 import { channelStreams, switchSource, disconnectClient, stopChannel, sessionDetail, channelLogoUrl } from '../api.js';
 import ProgramTimeline from './ProgramTimeline.jsx';
+import AudioStats from './AudioStats.jsx';
+import { audioSummary, audioTracks, duration, finiteNumber } from '../utils/streamStats.js';
 
 function formatUptime(seconds) {
   if (seconds == null) return '-';
@@ -64,7 +66,7 @@ function SourceSelect({ options, value, onChange, disabled, loading }) {
                     {option.value === value && <IconCheck size={14} style={{ flexShrink: 0 }} />}
                   </Group>
                   {option.provider && <Text size="xs" c="dimmed" truncate>{option.provider}</Text>}
-                  {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" />}
+                  {option.stats && <StreamStatsBadges stats={option.stats} size="xs" justify="flex-start" sourceOption />}
                 </Stack>
               </Combobox.Option>
             ))}
@@ -81,26 +83,30 @@ export function StreamStatsBadges({
   size = 'sm',
   justify = 'center',
   style,
+  sourceOption = false,
   ...groupProps
 }) {
   if (!stats) return null;
+  const tracks = audioTracks(stats);
+  const hasAudio = tracks.length > 0 || audioSummary(stats);
+  const cushion = sourceOption ? null : duration(stats.cushion_remaining);
+  const prebuffer = sourceOption ? duration(stats.join_prebuffer_seconds) : null;
   const hasAny =
     stats.resolution ||
     stats.source_fps ||
     stats.video_codec ||
-    stats.audio_codec ||
-    stats.audio_channels ||
+    hasAudio ||
     stats.stream_type ||
-    speed != null;
-  if (!hasAny) return null;
+    speed != null || cushion != null || prebuffer != null;
   const badgeCount = [
     stats.resolution,
     stats.source_fps,
     stats.video_codec,
-    stats.audio_codec,
-    stats.audio_channels,
+    hasAudio,
     stats.stream_type,
     speed != null,
+    cushion != null,
+    prebuffer != null,
   ].filter(Boolean).length;
 
   return (
@@ -109,6 +115,7 @@ export function StreamStatsBadges({
       justify={justify}
       {...groupProps}
       style={{
+        display: hasAny ? undefined : 'none',
         flexWrap: 'wrap',
         maxWidth: badgeCount > 3 ? 280 : undefined,
         justifyContent: justify,
@@ -137,20 +144,7 @@ export function StreamStatsBadges({
           </Badge>
         </Tooltip>
       )}
-      {stats.audio_codec && (
-        <Tooltip label="Audio codec">
-          <Badge size={size} variant="light" color="pink">
-            {stats.audio_codec.toUpperCase()}
-          </Badge>
-        </Tooltip>
-      )}
-      {stats.audio_channels && (
-        <Tooltip label="Audio channel configuration">
-          <Badge size={size} variant="light" color="pink">
-            {stats.audio_channels}
-          </Badge>
-        </Tooltip>
-      )}
+      <AudioStats stats={stats} size={size} interactive={!sourceOption} />
       {stats.stream_type && (
         <Tooltip label="Stream type">
           <Badge size={size} variant="light" color="cyan">
@@ -163,6 +157,16 @@ export function StreamStatsBadges({
           <Badge size={size} variant="light" color={speed >= SPEED_OK_THRESHOLD ? 'green' : 'red'}>
             {speed.toFixed(2)}x
           </Badge>
+        </Tooltip>
+      )}
+      {cushion != null && (
+        <Tooltip label="Remaining ingest buffer cushion">
+          <Badge size={size} variant="light" color="gray">Cushion {cushion.toFixed(1)}s</Badge>
+        </Tooltip>
+      )}
+      {prebuffer != null && (
+        <Tooltip label="Measured join prebuffer">
+          <Badge size={size} variant="light" color="gray">Join prebuffer {prebuffer.toFixed(1)}s</Badge>
         </Tooltip>
       )}
     </Group>
@@ -341,7 +345,7 @@ export default function SessionCard({
 
   const name = session.channel_name || `Channel ${session.channel_id}`;
   const stateColor = resolveStatusColor(session.state, STATE_COLORS);
-  const speed = session.ffmpeg_speed != null ? parseFloat(session.ffmpeg_speed) : null;
+  const speed = finiteNumber(session.ffmpeg_speed);
 
   const streamOptions = (streams || []).map((s) => ({
     value: String(s.id),

@@ -1,4 +1,9 @@
 const liveChannelId = '11111111-1111-4111-8111-111111111111';
+const audioStreams = [
+  { index: 1, audio_language: 'eng', audio_codec: 'aac', audio_channels: 'stereo', audio_bitrate: 128, sample_rate: 48000 },
+  { index: 2, audio_language: 'spa', audio_codec: 'ac3', audio_channels: '5.1', audio_bitrate: 384 },
+  { pid: 256, audio_language: 'fra' },
+];
 
 function json(response, data, status = 200) {
   response.statusCode = status;
@@ -38,10 +43,13 @@ export function mockApi() {
               resolution: '1920x1080',
               source_fps: 29.97,
               video_codec: 'h264',
-              audio_codec: 'aac',
-              audio_channels: '2.0',
+              audio_codec: 'ac3',
+              audio_channels: '5.1',
+              audio_language: 'spa',
+              audio_streams: audioStreams,
               stream_type: 'hls',
               ffmpeg_speed: 1.02,
+              cushion_remaining: 0,
               clients: [
                 {
                   client_id: 'live-1',
@@ -105,6 +113,7 @@ export function mockApi() {
               video_codec: 'h264',
               audio_codec: 'aac',
               audio_channels: '2.0',
+              audio_streams: audioStreams,
               stream_type: 'hls',
               connections: [{
                 client_id: 'catchup-1',
@@ -149,8 +158,8 @@ export function mockApi() {
         if (/^\/api\/channels\/[^/]+\/streams$/.test(path)) {
           return json(response, {
             streams: [
-              { id: 101, name: 'Primary Source', provider: 'Primary Provider' },
-              { id: 102, name: 'Fallback Source', provider: 'Backup Provider' },
+              { id: 101, name: 'Primary Source', provider: 'Primary Provider', stats: { audio_streams: audioStreams, audio_codec: 'ac3', audio_channels: '5.1', join_prebuffer_seconds: 4.25 } },
+              { id: 102, name: 'Fallback Source', provider: 'Backup Provider', stats: { audio_codec: 'aac', audio_channels: 'stereo' } },
             ],
             current_stream_id: 101,
           });
