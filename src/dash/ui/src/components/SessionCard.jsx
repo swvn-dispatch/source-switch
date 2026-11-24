@@ -150,7 +150,11 @@ export function SessionStatsBlock({ session, speed, currentSource }) {
           <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
             <IconList size={14} /><Text size="sm" c="dimmed">Source</Text>
           </Group>
-          <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }} ta="right">{currentSource}</Text>
+          <Tooltip label={currentSource.label} disabled={!currentSource.label}>
+            <Text size="sm" truncate style={{ minWidth: 0, flex: 1 }} ta="right">
+              {currentSource.primary}{currentSource.secondary && <Text component="span" inherit c="dimmed"> ({currentSource.secondary})</Text>}
+            </Text>
+          </Tooltip>
         </Group>
         {session.stream_profile_name && (
           <Group gap="xs" justify="space-between" wrap="nowrap">
@@ -309,7 +313,14 @@ export default function SessionCard({
     provider: s.provider,
     stats: s.stats,
   }));
-  const currentSource = streamOptions.find((option) => option.value === currentStreamId)?.name || (streams === null ? 'Loading…' : 'Unknown');
+  const selectedSource = streamOptions.find((option) => option.value === currentStreamId);
+  const sourcePrimary = selectedSource?.provider || selectedSource?.name || (streams === null ? 'Loading…' : 'Unknown');
+  const sourceSecondary = selectedSource?.provider && selectedSource.name !== selectedSource.provider ? selectedSource.name : null;
+  const currentSource = {
+    primary: sourcePrimary,
+    secondary: sourceSecondary,
+    label: sourceSecondary ? `${sourcePrimary} (${sourceSecondary})` : sourcePrimary,
+  };
 
   return (
     <Card withBorder radius="md" padding="md">
